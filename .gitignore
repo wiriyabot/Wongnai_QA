@@ -8,3 +8,18 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Local tool files
+.python-version
+uv
+
+# App/runtime caches
+chroma_db/
+.streamlit/
+
+# Generated artifacts
+artifacts/assignment_demo.json
+artifacts/eval_result.json
+artifacts/tune_result.json
+artifacts/llm_sft_dataset.jsonl
+artifacts/typhoon_lora_adapter/checkpoint-*/
