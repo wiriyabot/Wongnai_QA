@@ -363,6 +363,13 @@ def render_empty_state() -> None:
     )
 
 
+def get_result_value(result: dict[str, Any], primary_key: str, *fallback_keys: str, default: Any = "") -> Any:
+    for key in (primary_key, *fallback_keys):
+        if key in result and result[key] is not None:
+            return result[key]
+    return default
+
+
 def main() -> None:
     configure_page()
     inject_styles()
@@ -435,6 +442,18 @@ def main() -> None:
     with st.spinner("กำลังค้นหาและสรุปคำตอบ..."):
         result = api_post("/query", payload)
 
+    baseline_answer = get_result_value(result, "baseline_answer", default="ไม่พบผลลัพธ์จาก baseline retrieval")
+    finetuned_answer = get_result_value(
+        result,
+        "finetuned_answer",
+        "answer",
+        "retrieval_answer",
+        "summary",
+        default=baseline_answer,
+    )
+    improved_answer = get_result_value(result, "improved_answer", default=finetuned_answer)
+    retrieved_documents = get_result_value(result, "retrieved_documents", "documents", default=[])
+
     st.markdown("<div class='results-shell'>", unsafe_allow_html=True)
     render_section_heading("Detected Query Signals", "The parser extracts explicit terms and semantic hints from your prompt.")
     render_tags(result["query_profile"])
@@ -447,7 +466,7 @@ def main() -> None:
             <div class="answer-card improved">
                 <div class="small-label">Baseline</div>
                 <div class="answer-title">ผลลัพธ์จาก baseline retrieval</div>
-                <pre class="answer-body">{escape(str(result["baseline_answer"]))}</pre>
+                <pre class="answer-body">{escape(str(baseline_answer))}</pre>
             </div>
             """,
             unsafe_allow_html=True,
@@ -458,14 +477,13 @@ def main() -> None:
             <div class="answer-card improved">
                 <div class="small-label">Finetuned</div>
                 <div class="answer-title">ผลลัพธ์จาก finetuned retriever</div>
-                <pre class="answer-body">{escape(str(result["finetuned_answer"]))}</pre>
+                <pre class="answer-body">{escape(str(finetuned_answer))}</pre>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     render_section_heading("คำตอบแบบสรุป", "คำตอบภาษาไทยที่สร้างจากเอกสารฝั่ง finetuned retriever")
-    improved_answer = result["improved_answer"] or result["finetuned_answer"]
     st.markdown(
         f"""
         <div class="answer-card improved">
@@ -478,5 +496,5 @@ def main() -> None:
     )
 
     render_section_heading("รีวิวที่เกี่ยวข้อง", "หลักฐานอ้างอิงจากฝั่ง finetuned retriever ที่ใช้ประกอบคำตอบ")
-    render_retrieved_documents(result["retrieved_documents"])
+    render_retrieved_documents(retrieved_documents)
     st.markdown("</div>", unsafe_allow_html=True)
