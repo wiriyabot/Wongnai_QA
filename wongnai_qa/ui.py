@@ -8,7 +8,7 @@ import requests
 import streamlit as st
 
 
-API_BASE_URL = os.getenv("WONGNAI_API_URL", "http://127.0.0.1:8001")
+API_BASE_URL = os.getenv("WONGNAI_API_URL", "http://127.0.0.1:8000")
 DEFAULT_TOP_K = 4
 DEFAULT_FETCH_K = 12
 DEFAULT_SAMPLE_SIZE = 1000

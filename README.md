@@ -65,7 +65,7 @@ pip install -r requirements.txt
 ## การรัน Backend
 
 ```powershell
-uv run uvicorn main:app --host 127.0.0.1 --port 8001
+uv run uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
 ## การรัน Frontend
@@ -79,7 +79,7 @@ uv run streamlit run streamlit_app.py
 ถ้า API ไม่ได้รันอยู่ที่ host หรือ port เดียวกัน:
 
 ```powershell
-$env:WONGNAI_API_URL="http://127.0.0.1:8001"
+$env:WONGNAI_API_URL="http://127.0.0.1:8000"
 uv run streamlit run streamlit_app.py
 ```
 
