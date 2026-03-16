@@ -1,0 +1,6 @@
+{
+  "index_version": "2.0",
+  "embedding_model": "intfloat/multilingual-e5-large",
+  "sample_size": 20,
+  "collection_name": "wongnai_reviews_v2"
+}
