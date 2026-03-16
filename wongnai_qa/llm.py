@@ -1,5 +1,6 @@
+from dataclasses import dataclass
+
 import torch
-from langchain_huggingface import HuggingFacePipeline
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -15,6 +16,31 @@ from wongnai_qa.config import (
     MAX_NEW_TOKENS,
     resolve_cached_model_path,
 )
+
+
+@dataclass
+class LocalGenerator:
+    text_pipeline: any
+    tokenizer: any
+    system_prompt: str = "You are a helpful multilingual assistant. Follow the user's instructions carefully and answer in Thai when requested."
+
+    def invoke(self, prompt: str) -> str:
+        formatted_prompt = prompt
+        chat_template = getattr(self.tokenizer, "chat_template", None)
+        if chat_template:
+            formatted_prompt = self.tokenizer.apply_chat_template(
+                [
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+
+        result = self.text_pipeline(formatted_prompt)
+        if isinstance(result, list) and result:
+            return str(result[0].get("generated_text", "")).strip()
+        return str(result).strip()
 
 
 def load_llm():
@@ -54,8 +80,11 @@ def load_llm():
     from wongnai_qa.finetuning import adapter_exists, load_model_with_adapter
 
     if adapter_exists(LLM_ADAPTER_DIR):
-        print(f"Loading LoRA adapter from {LLM_ADAPTER_DIR}")
-        model = load_model_with_adapter(model, LLM_ADAPTER_DIR)
+        try:
+            print(f"Loading LoRA adapter from {LLM_ADAPTER_DIR}")
+            model = load_model_with_adapter(model, LLM_ADAPTER_DIR)
+        except Exception as exc:
+            print(f"Skipping LoRA adapter at {LLM_ADAPTER_DIR}: {exc}")
 
     generation_config = GenerationConfig.from_model_config(model.config)
     generation_config.max_new_tokens = MAX_NEW_TOKENS
@@ -69,11 +98,11 @@ def load_llm():
     generation_config.max_length = None
     model.generation_config = generation_config
 
-    pipe = pipeline(
+    text_pipe = pipeline(
         "text-generation",
         model=model,
         tokenizer=tokenizer,
         return_full_text=False,
     )
 
-    return HuggingFacePipeline(pipeline=pipe)
+    return LocalGenerator(text_pipeline=text_pipe, tokenizer=tokenizer)

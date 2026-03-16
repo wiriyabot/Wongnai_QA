@@ -23,11 +23,23 @@ from wongnai_qa.config import (
     VECTOR_COLLECTION_NAME,
     VECTOR_DB_DIR,
     VECTOR_DB_META_PATH,
+    resolve_cached_model_path,
 )
 
 
 ARTIFACTS_DIR = VECTOR_DB_DIR.parent / "artifacts"
 TUNED_WEIGHTS_PATH = ARTIFACTS_DIR / "tuned_retriever_weights.json"
+
+PRICE_CONTRADICTIONS = {
+    "budget": {"expensive"},
+    "expensive": {"budget"},
+}
+
+TEXT_CONTRADICTION_HINTS = {
+    ("price", "budget"): ["แพง", "ราคาแรง", "แพงมาก", "ค่อนข้างแพง"],
+    ("price", "expensive"): ["ถูก", "ไม่แพง", "ย่อมเยา", "ประหยัด", "คุ้ม"],
+    ("ambience", "quiet"): ["คนเยอะ", "แน่น", "เสียงดัง", "วุ่นวาย", "พลุกพล่าน"],
+}
 
 
 @dataclass(frozen=True)
@@ -41,8 +53,9 @@ class ScoringWeights:
 class E5Embeddings(Embeddings):
     def __init__(self, model_name: str):
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        model_path = resolve_cached_model_path(model_name)
         self.base_embeddings = HuggingFaceEmbeddings(
-            model_name=model_name,
+            model_name=model_path,
             model_kwargs={"device": device, "local_files_only": HF_LOCAL_FILES_ONLY},
             encode_kwargs={"normalize_embeddings": True},
         )
@@ -145,6 +158,7 @@ def _score_document(
     weights = weights or load_tuned_weights()
     query_text = query_profile["normalized_query"].lower()
     query_terms = set(term.lower() for term in query_profile["query_terms"])
+    query_tokens = set(token.lower() for token in query_profile.get("query_tokens", []))
     doc_text = document.page_content.lower()
     metadata = document.metadata
 
@@ -164,13 +178,97 @@ def _score_document(
         score += (tag_matches / tag_total) * weights.tag
 
     if query_terms:
-        matched_terms = sum(1 for term in query_terms if term in doc_text)
+        doc_known_terms = {value for value in str(metadata.get("known_terms", "")).split("|") if value}
+        matched_terms = sum(
+            1 for term in query_terms if term in doc_text or term in doc_known_terms
+        )
         score += (matched_terms / len(query_terms)) * weights.keyword
+
+    if query_tokens:
+        matched_tokens = sum(1 for token in query_tokens if token in doc_text)
+        score += (matched_tokens / len(query_tokens)) * (weights.keyword * 0.5)
 
     if query_text and query_text in doc_text:
         score += weights.exact
 
+    score -= _conflict_penalty(document, query_profile)
     return score
+
+
+def _conflict_penalty(document: Document, query_profile: dict[str, Any]) -> float:
+    penalty = 0.0
+    metadata = document.metadata
+    doc_text = document.page_content.lower()
+
+    for group_name, values in query_profile["detected_tags"].items():
+        if not values:
+            continue
+        doc_values = {value for value in str(metadata.get(group_name, "")).split("|") if value}
+        for value in values:
+            conflicting_values = PRICE_CONTRADICTIONS.get(value, set())
+            if conflicting_values.intersection(doc_values):
+                penalty += 0.55
+
+            contradiction_hints = TEXT_CONTRADICTION_HINTS.get((group_name, value), [])
+            if any(hint in doc_text for hint in contradiction_hints):
+                penalty += 0.35
+
+        if group_name == "location" and doc_values and not doc_values.intersection(values):
+            penalty += 0.25
+
+    return penalty
+
+
+def _match_stats(document: Document, query_profile: dict[str, Any]) -> dict[str, float]:
+    metadata = document.metadata
+    doc_text = document.page_content.lower()
+    doc_known_terms = {value for value in str(metadata.get("known_terms", "")).split("|") if value}
+
+    requested_groups = 0
+    matched_groups = 0
+    for group_name, values in query_profile["detected_tags"].items():
+        if not values:
+            continue
+        requested_groups += 1
+        doc_values = {value for value in str(metadata.get(group_name, "")).split("|") if value}
+        if doc_values.intersection(values):
+            matched_groups += 1
+
+    query_terms = [term.lower() for term in query_profile.get("query_terms", [])]
+    query_tokens = [token.lower() for token in query_profile.get("query_tokens", [])]
+    matched_terms = sum(1 for term in query_terms if term in doc_text or term in doc_known_terms)
+    matched_tokens = sum(1 for token in query_tokens if token in doc_text)
+
+    group_ratio = matched_groups / requested_groups if requested_groups else 0.0
+    term_ratio = matched_terms / len(query_terms) if query_terms else 0.0
+    token_ratio = matched_tokens / len(query_tokens) if query_tokens else 0.0
+    coverage_components = [
+        ratio
+        for ratio in (group_ratio, term_ratio, token_ratio)
+        if ratio > 0
+    ]
+    coverage = sum(coverage_components) / len(coverage_components) if coverage_components else 0.0
+    return {
+        "group_ratio": group_ratio,
+        "term_ratio": term_ratio,
+        "token_ratio": token_ratio,
+        "coverage": coverage,
+    }
+
+
+def _prioritize_matching_documents(
+    documents: list[Document],
+    query_profile: dict[str, Any],
+    k: int,
+) -> list[Document]:
+    matched: list[Document] = []
+    fallback: list[Document] = []
+    for document in documents:
+        if document_matches_query(document, query_profile):
+            matched.append(document)
+        else:
+            fallback.append(document)
+    return _deduplicate_documents(matched + fallback, k=k)
 
 
 def _deduplicate_documents(documents: list[Document], k: int) -> list[Document]:
@@ -210,7 +308,7 @@ def rank_documents_by_profile(
         key=lambda document: _score_document(document, query_profile, weights=weights),
         reverse=True,
     )
-    return _deduplicate_documents(ranked, k=k)
+    return _prioritize_matching_documents(ranked, query_profile=query_profile, k=k)
 
 
 def retrieve_documents(
@@ -229,22 +327,18 @@ def retrieve_documents(
         key=lambda document: _score_document(document, query_profile, weights=weights),
         reverse=True,
     )
-    return _deduplicate_documents(ranked, k=k)
+    return _prioritize_matching_documents(ranked, query_profile=query_profile, k=k)
 
 
 def document_matches_query(document: Document, query_profile: dict[str, Any]) -> bool:
-    metadata = document.metadata
-    for group_name, values in query_profile["detected_tags"].items():
-        if not values:
-            continue
-        doc_values = {value for value in str(metadata.get(group_name, "")).split("|") if value}
-        if doc_values.intersection(values):
-            return True
+    stats = _match_stats(document, query_profile)
+    requested_groups = sum(1 for values in query_profile["detected_tags"].values() if values)
+    has_specific_terms = bool(query_profile.get("query_terms") or query_profile.get("query_tokens"))
 
-    doc_text = document.page_content.lower()
-    doc_known_terms = {value for value in str(metadata.get("known_terms", "")).split("|") if value}
-    for term in query_profile["query_terms"]:
-        lowered_term = term.lower()
-        if lowered_term in doc_text or lowered_term in doc_known_terms:
-            return True
+    if requested_groups >= 2:
+        return stats["group_ratio"] >= 0.5 or stats["coverage"] >= 0.55
+    if requested_groups == 1:
+        return stats["group_ratio"] >= 1.0 or stats["coverage"] >= 0.45
+    if has_specific_terms:
+        return max(stats["term_ratio"], stats["token_ratio"]) >= 0.34
     return False

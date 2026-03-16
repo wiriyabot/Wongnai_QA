@@ -28,7 +28,7 @@
 - [scripts/evaluate_models.py](c:/Users/com/Desktop/NLP/scripts/evaluate_models.py): วัดผล baseline เทียบ finetuned
 - [scripts/run_assignment_demo.py](c:/Users/com/Desktop/NLP/scripts/run_assignment_demo.py): รัน query ตัวอย่างครบ 5 หมวดตามโจทย์
 - [scripts/build_llm_sft_dataset.py](c:/Users/com/Desktop/NLP/scripts/build_llm_sft_dataset.py): สร้าง supervised fine-tuning dataset สำหรับ LLM
-- [scripts/train_llm_lora.py](c:/Users/com/Desktop/NLP/scripts/train_llm_lora.py): train LoRA adapter สำหรับ `typhoon-7b`
+- [scripts/train_llm_lora.py](c:/Users/com/Desktop/NLP/scripts/train_llm_lora.py): train LoRA adapter สำหรับ `Qwen2.5-7B-Instruct`
 
 ## โครงสร้างโฟลเดอร์
 
@@ -62,6 +62,23 @@ uv sync
 pip install -r requirements.txt
 ```
 
+## เริ่มใช้งานครั้งแรก
+
+ถ้ายังไม่ได้ tune retriever หรือ train LoRA อะไรเลย ให้เริ่มจาก baseline ก่อน:
+
+```powershell
+uv sync
+uv run python main.py --query "หาร้านอาหารทะเลแถวพัทยา" --skip-llm
+```
+
+คำสั่งนี้จะทดสอบ retrieval pipeline โดยยังไม่โหลด LLM และเหมาะกับเครื่องใหม่ที่สุด
+
+ถ้าต้องการให้ระบบสร้าง vector index ใหม่ตั้งแต่ต้น ให้เพิ่ม `--rebuild`
+
+```powershell
+uv run python main.py --query "หาร้านอาหารทะเลแถวพัทยา" --skip-llm --rebuild
+```
+
 ## การรัน Backend
 
 ```powershell
@@ -89,6 +106,12 @@ uv run streamlit run streamlit_app.py
 uv run python main.py --query "อาหารทะเลแบบไทยๆ ติดชายหาดแถวพัทยา"
 ```
 
+ถ้าเครื่องไม่มี GPU หรือยังไม่พร้อมใช้โมเดล generative ให้ใช้โหมด retrieval-only:
+
+```powershell
+uv run python main.py --query "อาหารทะเลแบบไทยๆ ติดชายหาดแถวพัทยา" --skip-llm
+```
+
 ตัวอย่างการทดสอบแบบ retrieval-only:
 
 ```powershell
@@ -97,11 +120,20 @@ uv run python main.py --sample-size 300 --rebuild --skip-llm --query "ร้า�
 
 ## การ tune retriever
 
+การ tune ในโปรเจกต์นี้คือการเลือก `scoring weights` สำหรับขั้น rerank จาก labeled queries ไม่ใช่การ train embedding model ใหม่
+
 สร้างน้ำหนักของ finetuned retriever จาก query labels:
 
 ```powershell
 uv run python scripts/tune_retriever.py
 ```
+
+สคริปต์จะ:
+
+- โหลด query labels จาก `review_dataset/labeled_queries_by_algo.txt` และ `review_dataset/labeled_queries_by_judges.txt`
+- สร้าง benchmark และ split train/eval
+- ทดลอง candidate weights หลายชุด
+- บันทึก weights ที่ดีที่สุดไว้ใช้งานต่อ
 
 ไฟล์น้ำหนักที่ tune แล้วจะถูกบันทึกไว้ที่:
 
@@ -120,6 +152,8 @@ uv run python scripts/evaluate_models.py
 
 ## การ fine-tune LLM ด้วย LoRA/QLoRA
 
+การ train LoRA ต้องใช้ GPU ที่รองรับ CUDA และต้องมี base model อยู่ใน Hugging Face cache อยู่แล้ว
+
 สร้าง SFT dataset:
 
 ```powershell
@@ -132,9 +166,11 @@ train LoRA adapter:
 uv run python scripts/train_llm_lora.py
 ```
 
+หมายเหตุ: `scripts/train_llm_lora.py` จะเรียกสร้าง SFT dataset ให้อีกครั้งอยู่แล้ว ดังนั้นถ้าต้องการรันแบบสั้นที่สุด ใช้คำสั่งเดียวนี้ก็พอ
+
 adapter ที่ train แล้วจะถูกเก็บไว้ที่:
 
-- `artifacts/typhoon_lora_adapter`
+- `artifacts/qwen2_5_7b_instruct_lora_adapter`
 
 ถ้ามี adapter อยู่แล้ว ระบบ inference จะโหลด adapter นี้ให้อัตโนมัติ
 
@@ -162,8 +198,11 @@ uv run python scripts/run_assignment_demo.py
 ## หมายเหตุสำคัญ
 
 - embedding model เริ่มต้น: `intfloat/multilingual-e5-large`
-- generator model เริ่มต้น: `scb10x/typhoon-7b`
+- generator model เริ่มต้น: `Qwen/Qwen2.5-7B-Instruct`
 - โปรเจกต์นี้ตั้งค่าให้รองรับการใช้งานแบบ cached / offline สำหรับ Hugging Face model เป็นหลัก
+- ใน `wongnai_qa/config.py` มีการตั้ง `HF_HUB_OFFLINE=1` และ `TRANSFORMERS_OFFLINE=1` เป็นค่าเริ่มต้น
+- ถ้าเครื่องใหม่ยังไม่มี model cache ของ Hugging Face อยู่แล้ว การโหลด embedding model หรือ LLM อาจไม่สำเร็จ
+- การใช้ LLM inference และการ train LoRA ในค่าเริ่มต้นของโปรเจกต์นี้ต้องใช้ GPU; ถ้าไม่มี GPU ให้เริ่มด้วย `--skip-llm`
 - baseline model ในโปรเจกต์นี้คือ pure vector retrieval
 - finetuned model ในโปรเจกต์นี้คือ retriever/reranker ที่ปรับน้ำหนักจาก labeled queries ใน dataset
 - generative answer จะอิงเอกสารที่ได้จากฝั่ง finetuned retriever

@@ -35,6 +35,7 @@ QUERY_TAG_GROUPS = {
         "dessert_drink": ["ของหวาน", "ขนม", "เครื่องดื่ม", "dessert", "coffee", "ชา", "คาเฟ่"],
         "ice_cream": ["ไอศกรีม", "ice cream", "gelato"],
         "curry_rice": ["ข้าวแกง", "แกงราดข้าว"],
+        "rice_porridge": ["ข้าวต้ม", "porridge", "congee"],
         "noodle": ["ก๋วยเตี๋ยว", "บะหมี่", "ราเมง", "noodle"],
         "made_to_order": ["ตามสั่ง", "อาหารตามสั่ง", "ผัดกะเพรา"],
         "healthy": ["สุขภาพ", "healthy", "คลีน", "สลัด", "อกไก่"],
@@ -59,6 +60,23 @@ QUERY_TAG_GROUPS = {
         "bangkok": ["กรุงเทพ", "bangkok", "กทม"],
         "riverside": ["ริมแม่น้ำ", "ริมน้ำ", "river"],
     },
+}
+
+QUERY_STOPWORDS = {
+    "ร้าน",
+    "ร้านอาหาร",
+    "อาหาร",
+    "มี",
+    "ไหม",
+    "หน่อย",
+    "ที่",
+    "และ",
+    "หรือ",
+    "แบบ",
+    "แถว",
+    "อำเภอ",
+    "เมือง",
+    "จังหวัด",
 }
 
 
@@ -134,6 +152,20 @@ def _extract_known_terms(text: str, resource_bundle: ResourceBundle, limit: int 
         if any(term in existing for existing in filtered):
             continue
         filtered.append(term)
+        if len(filtered) >= limit:
+            break
+    return filtered
+
+
+def _extract_query_tokens(text: str, limit: int = 10) -> list[str]:
+    tokens = [token.lower() for token in re.findall(r"[\w\u0E00-\u0E7F]+", text)]
+    filtered: list[str] = []
+    for token in tokens:
+        if len(token) < 2 or token.isdigit() or token in QUERY_STOPWORDS:
+            continue
+        if token in filtered:
+            continue
+        filtered.append(token)
         if len(filtered) >= limit:
             break
     return filtered
@@ -215,10 +247,12 @@ def analyze_query(query: str, resource_bundle: ResourceBundle | None = None) -> 
         for group_name, groups in QUERY_TAG_GROUPS.items()
     }
     query_terms = _extract_known_terms(normalized, resource_bundle)
+    query_tokens = _extract_query_tokens(normalized)
     expansion_terms = []
     for values in detected_tags.values():
         expansion_terms.extend(values)
     expansion_terms.extend(query_terms)
+    expansion_terms.extend(query_tokens)
     expanded_query = " ".join(
         part for part in [normalized, " ".join(expansion_terms)] if part.strip()
     )
@@ -228,5 +262,5 @@ def analyze_query(query: str, resource_bundle: ResourceBundle | None = None) -> 
         "expanded_query": expanded_query,
         "detected_tags": detected_tags,
         "query_terms": query_terms,
+        "query_tokens": query_tokens,
     }
-

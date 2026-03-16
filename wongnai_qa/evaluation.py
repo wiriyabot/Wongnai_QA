@@ -123,7 +123,7 @@ def _evaluate_queries(
 
 def tune_retriever_weights(
     sample_size: int = INDEX_SAMPLE_SIZE,
-    benchmark_limit: int = 3,
+    benchmark_limit: int = 64,
     top_k: int = 4,
     fetch_k: int = 6,
 ) -> dict[str, Any]:
@@ -188,7 +188,7 @@ def tune_retriever_weights(
 
 def evaluate_current_models(
     sample_size: int = INDEX_SAMPLE_SIZE,
-    benchmark_limit: int = 2,
+    benchmark_limit: int = 80,
     top_k: int = 4,
     fetch_k: int = 6,
 ) -> dict[str, Any]:

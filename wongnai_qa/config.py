@@ -23,9 +23,12 @@ VECTOR_COLLECTION_NAME = "wongnai_reviews_v2"
 INDEX_VERSION = "2.0"
 
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "intfloat/multilingual-e5-large")
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "scb10x/typhoon-7b")
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
 HF_LOCAL_FILES_ONLY = os.getenv("HF_LOCAL_FILES_ONLY", "1") == "1"
-LLM_ADAPTER_DIR = os.getenv("LLM_ADAPTER_DIR", str(BASE_DIR / "artifacts" / "typhoon_lora_adapter"))
+LLM_ADAPTER_DIR = os.getenv(
+    "LLM_ADAPTER_DIR",
+    str(BASE_DIR / "artifacts" / "qwen2_5_7b_instruct_lora_adapter"),
+)
 
 INDEX_SAMPLE_SIZE = int(os.getenv("WONGNAI_SAMPLE_SIZE", "3000"))
 CHUNK_SIZE = int(os.getenv("WONGNAI_CHUNK_SIZE", "700"))

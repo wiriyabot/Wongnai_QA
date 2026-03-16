@@ -33,7 +33,7 @@ from wongnai_qa.config import (
 )
 from wongnai_qa.evaluation import build_benchmark
 from wongnai_qa.preprocessing import analyze_query, load_and_preprocess_data, load_resource_bundle
-from wongnai_qa.retrieval import rank_documents_by_profile
+from wongnai_qa.retrieval import document_matches_query, get_vector_store, retrieve_documents
 
 
 PROMPT_TEMPLATE = """คุณเป็นผู้ช่วยแนะนำร้านอาหารจากรีวิว Wongnai
@@ -75,7 +75,7 @@ def _format_docs_for_training(documents: list[Any]) -> str:
 
 def _build_target_answer(question: str, documents: list[Any]) -> str:
     if not documents:
-        return "ไม่พบข้อมูลรีวิวที่ตรงกับคำถามนี้ในชุดข้อมูล"
+        return "ไม่พบข้อมูลรีวิวที่ตรงกับคำถามนี้ในชุดข้อมูล หรือหลักฐานยังไม่ชัดเจนพอสำหรับการแนะนำร้าน"
 
     lines = [f"คำแนะนำสำหรับคำถาม: {question}"]
     for index, document in enumerate(documents, start=1):
@@ -94,7 +94,10 @@ def _build_target_answer(question: str, documents: list[Any]) -> str:
             f"{' | '.join(tags) if tags else 'ไม่มี tag ชัดเจน'} | "
             f"หลักฐาน: {excerpt}"
         )
-    lines.append("สรุป: เลือกจากตัวเลือกที่ rating และ tag ตรงกับคำถามมากที่สุด")
+    if len(documents) < 2:
+        lines.append("สรุป: หลักฐานมีจำกัด ควรใช้ข้อมูลรีวิวนี้เป็นเพียงตัวช่วยประกอบการตัดสินใจ")
+    else:
+        lines.append("สรุป: เลือกจากตัวเลือกที่มีหลักฐานในรีวิวสอดคล้องกับคำถามมากที่สุด")
     return "\n".join(lines)
 
 
@@ -105,16 +108,21 @@ def build_sft_examples(
 ) -> list[dict[str, Any]]:
     resource_bundle = load_resource_bundle()
     documents = load_and_preprocess_data(sample_size=sample_size)
+    vector_store = get_vector_store(documents=documents, sample_size=sample_size)
     benchmark_examples = build_benchmark(limit=benchmark_limit)
 
     examples: list[dict[str, Any]] = []
     for example in benchmark_examples:
         query_profile = analyze_query(example.query, resource_bundle=resource_bundle)
-        top_documents = rank_documents_by_profile(
-            documents,
+        retrieved_documents = retrieve_documents(
+            vector_store,
             query_profile=query_profile,
             k=top_k,
+            fetch_k=max(top_k * 8, 24),
         )
+        top_documents = [
+            document for document in retrieved_documents if document_matches_query(document, query_profile)
+        ]
         context = _format_docs_for_training(top_documents)
         answer = _build_target_answer(example.query, top_documents)
         prompt = PROMPT_TEMPLATE.format(question=example.query, context=context)

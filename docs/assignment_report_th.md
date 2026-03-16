@@ -151,7 +151,7 @@
 
 ### 7.2 Generation model
 
-ใช้ `scb10x/typhoon-7b`
+ใช้ `Qwen/Qwen2.5-7B-Instruct`
 
 เหตุผล:
 
@@ -307,7 +307,7 @@ prompt ถูกออกแบบให้:
 
 1. สร้าง SFT dataset จาก query labels และ evidence ที่ retrieve ได้
 2. แปลงให้อยู่ในรูป instruction-response
-3. train LoRA adapter บน `scb10x/typhoon-7b`
+3. train LoRA adapter บน `Qwen/Qwen2.5-7B-Instruct`
 4. โหลด adapter กลับมาใช้ใน inference
 
 ### 12.2 ทำไปทำไม
@@ -329,7 +329,7 @@ LoRA fine-tuning ช่วยให้ LLM:
 ### 12.4 Artifact ที่ได้
 
 - SFT dataset: [artifacts/llm_sft_dataset.jsonl](/abs/path/c:/Users/com/Desktop/NLP/artifacts/llm_sft_dataset.jsonl)
-- LoRA adapter: [artifacts/typhoon_lora_adapter](/abs/path/c:/Users/com/Desktop/NLP/artifacts/typhoon_lora_adapter)
+- LoRA adapter: [artifacts/qwen2_5_7b_instruct_lora_adapter](/abs/path/c:/Users/com/Desktop/NLP/artifacts/qwen2_5_7b_instruct_lora_adapter)
 
 ระบบ inference ใน [wongnai_qa/llm.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/llm.py) จะพยายามโหลด adapter นี้อัตโนมัติถ้ามีอยู่
 
@@ -540,8 +540,8 @@ flowchart TD
     L1[โหลด labeled queries] --> L2[Retrieve evidence จาก dataset]
     L2 --> L3[สร้าง instruction-response examples]
     L3 --> L4[บันทึกเป็น SFT dataset]
-    L4 --> L5[Train LoRA adapter บน typhoon-7b]
-    L5 --> L6[บันทึก adapter ลง artifacts/typhoon_lora_adapter]
+    L4 --> L5[Train LoRA adapter บน Qwen2.5-7B-Instruct]
+    L5 --> L6[บันทึก adapter ลง artifacts/qwen2_5_7b_instruct_lora_adapter]
     L6 --> L7[โหลด adapter ใน inference]
 ```
 
@@ -560,10 +560,10 @@ retrieve evidence จาก dataset
 บันทึกเป็น SFT dataset
     |
     v
-train LoRA adapter บน typhoon-7b
+train LoRA adapter บน Qwen2.5-7B-Instruct
     |
     v
-บันทึก adapter ลง artifacts/typhoon_lora_adapter
+บันทึก adapter ลง artifacts/qwen2_5_7b_instruct_lora_adapter
     |
     v
 โหลด adapter ใน inference
@@ -590,7 +590,7 @@ train LoRA adapter บน typhoon-7b
 - [scripts/evaluate_models.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/evaluate_models.py): วัดผล baseline เทียบ finetuned
 - [scripts/run_assignment_demo.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/run_assignment_demo.py): รัน query ตัวอย่างครบ 5 หมวดตามโจทย์
 - [scripts/build_llm_sft_dataset.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/build_llm_sft_dataset.py): สร้าง supervised fine-tuning dataset สำหรับ LLM
-- [scripts/train_llm_lora.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/train_llm_lora.py): train LoRA adapter สำหรับ typhoon-7b
+- [scripts/train_llm_lora.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/train_llm_lora.py): train LoRA adapter สำหรับ Qwen2.5-7B-Instruct
 
 ## 17. การประเมินผล (Evaluation)
 
@@ -624,7 +624,7 @@ artifact ที่มีอยู่แล้วในโปรเจกต์:
 - [artifacts/eval_result.json](/abs/path/c:/Users/com/Desktop/NLP/artifacts/eval_result.json)
 - [artifacts/assignment_demo.json](/abs/path/c:/Users/com/Desktop/NLP/artifacts/assignment_demo.json)
 - [artifacts/llm_sft_dataset.jsonl](/abs/path/c:/Users/com/Desktop/NLP/artifacts/llm_sft_dataset.jsonl)
-- [artifacts/typhoon_lora_adapter](/abs/path/c:/Users/com/Desktop/NLP/artifacts/typhoon_lora_adapter)
+- [artifacts/qwen2_5_7b_instruct_lora_adapter](/abs/path/c:/Users/com/Desktop/NLP/artifacts/qwen2_5_7b_instruct_lora_adapter)
 
 ผลที่ได้ในรอบทดลองที่มีการบันทึกไว้:
 
