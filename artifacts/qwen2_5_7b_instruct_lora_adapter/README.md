@@ -1,11 +1,15 @@
 ---
-library_name: transformers
+library_name: peft
 model_name: qwen2_5_7b_instruct_lora_adapter
 tags:
-- generated_from_trainer
+- base_model:adapter:C:\Users\com\.cache\huggingface\hub\models--Qwen--Qwen2.5-7B-Instruct\snapshots\a09a35458c702b33eeacc393d103063234e8bc28
+- lora
 - sft
+- transformers
 - trl
 licence: license
+base_model: C:\Users\com\.cache\huggingface\hub\models--Qwen--Qwen2.5-7B-Instruct\snapshots\a09a35458c702b33eeacc393d103063234e8bc28
+pipeline_tag: text-generation
 ---
 
 # Model Card for qwen2_5_7b_instruct_lora_adapter
@@ -34,6 +38,7 @@ This model was trained with SFT.
 
 ### Framework versions
 
+- PEFT 0.18.1
 - TRL: 0.29.0
 - Transformers: 5.3.0
 - Pytorch: 2.10.0+cu128
@@ -49,7 +54,7 @@ Cite TRL as:
 ```bibtex
 @software{vonwerra2020trl,
   title   = {{TRL: Transformers Reinforcement Learning}},
-  author  = {von Werra, Leandro and Belkada, Younes and Tunstall, Lewis and Beeching, Edward and Thrush, Tristan and Lambert, Nathan and Huang, Shengyi and Rasul, Kashif and Gallouédec, Quentin},
+  author  = {von Werra, Leandro and Belkada, Younes and Tunstall, Lewis and Beeching, Edward and Thrush, Tristan and Lambert, Nathan and Huang, Shengyi and Rasul, Kashif and GallouÃ©dec, Quentin},
   license = {Apache-2.0},
   url     = {https://github.com/huggingface/trl},
   year    = {2020}
