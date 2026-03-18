@@ -1,101 +1,62 @@
-# รายงานสรุปแนวคิดและกระบวนการทำงานของระบบ Wongnai Restaurant QA
+# รายงานเชิงวิชาการ: ระบบถามตอบและแนะนำร้านอาหารจากข้อมูลรีวิว Wongnai ด้วย Retrieval-Augmented Generation
 
-## 1. บทนำและเป้าหมายของงาน
+## 1. บทนำ
 
-โปรเจกต์นี้พัฒนาระบบถามตอบเกี่ยวกับอาหารและร้านอาหารจากข้อมูลรีวิว Wongnai โดยใช้ข้อมูลหลักจาก `wongnai-review-dataset` และ resource เสริมที่โจทย์ระบุ ได้แก่ `food_dictionary.txt`, `labeled_queries_by_algo.txt` และ `labeled_queries_by_judges.txt`
+งานวิจัยนี้มีวัตถุประสงค์เพื่อพัฒนาระบบถามตอบเกี่ยวกับอาหารและร้านอาหารโดยใช้ข้อมูลรีวิวจากชุดข้อมูล Wongnai เป็นแหล่งความรู้หลัก ระบบถูกออกแบบให้รองรับคำถามที่เกี่ยวข้องกับสัญชาติอาหาร ประเภทอาหาร บรรยากาศและราคา สถานที่ตั้ง และคำถามแบบผสมหลายเงื่อนไข โดยคำตอบต้องอ้างอิงจากหลักฐานจริงในชุดข้อมูล ไม่ใช่การตอบจากความรู้ทั่วไปของโมเดลเพียงอย่างเดียว
 
-เป้าหมายของระบบคือรับคำถามภาษาธรรมชาติจากผู้ใช้ แล้วตอบกลับเป็นคำแนะนำร้านหรือสรุปข้อมูลที่เกี่ยวข้อง โดยอ้างอิงจากรีวิวจริงใน dataset ไม่ใช่การตอบแบบเดาสุ่มจากความรู้ทั่วไปของโมเดลเพียงอย่างเดียว
+สถาปัตยกรรมของระบบใช้แนวคิด Retrieval-Augmented Generation (RAG) ซึ่งแบ่งงานออกเป็น 2 ส่วนหลัก ได้แก่ retrieval สำหรับค้นคืนรีวิวที่เกี่ยวข้อง และ generation สำหรับสรุปคำตอบให้เป็นภาษาธรรมชาติที่อ่านเข้าใจง่าย นอกจากนี้ยังมีการเปรียบเทียบผลระหว่าง baseline model กับ finetuned model เพื่อศึกษาว่า query understanding และ reranking ที่ปรับแต่งเชิงโดเมนช่วยเพิ่มคุณภาพการตอบคำถามได้มากน้อยเพียงใด
 
-ระบบนี้ออกแบบให้ครอบคลุมคำถามอย่างน้อย 5 กลุ่มตามโจทย์:
+## 2. วัตถุประสงค์ของงาน
 
-1. คำถามเกี่ยวกับสัญชาติอาหาร เช่น ไทย จีน ญี่ปุ่น อินเดีย อิตาลี ฟิวชัน
-2. คำถามเกี่ยวกับประเภทอาหาร เช่น อาหารทะเล พิซซ่า เบเกอรี่ ของหวาน เครื่องดื่ม ก๋วยเตี๋ยว อาหารสุขภาพ
-3. คำถามเกี่ยวกับบรรยากาศร้านและราคา เช่น หรูหรา ติดแอร์ ข้างทาง ราคาย่อมเยา ราคาแพง
-4. คำถามเกี่ยวกับสถานที่ตั้ง เช่น พัทยา เชียงใหม่ ติดทะเล บนเขา บรรยากาศสงบ
-5. คำถามแบบผสมหลายเงื่อนไข เช่น อาหารทะเลแบบไทย ๆ ติดชายหาดแถวพัทยา
+1. พัฒนาระบบถามตอบที่สามารถใช้ข้อมูลจาก `wongnai-review-dataset` ในการตอบคำถามเกี่ยวกับอาหารและร้านอาหารได้จริง
+2. รองรับคำถามอย่างน้อย 5 กลุ่ม ได้แก่ สัญชาติอาหาร ประเภทอาหาร บรรยากาศ/ราคา สถานที่ตั้ง และคำถามแบบผสม
+3. เปรียบเทียบผลการทำงานระหว่าง baseline retrieval กับ finetuned retrieval
+4. ใช้ pretrained model ที่รองรับภาษาไทยและภาษาอังกฤษ
+5. แสดงผลการแนะนำร้านพร้อม star rating และหลักฐานจากรีวิว
 
-นอกจากการตอบคำถามให้ใช้งานได้จริงแล้ว งานนี้ยังต้องแสดงให้เห็นองค์ประกอบสำคัญของระบบ NLP ครบถ้วน ได้แก่
+## 3. ชุดข้อมูลที่ใช้
 
-- การเตรียมข้อมูล
-- การเลือก pretrained model
-- การออกแบบ retrieval
-- การใช้ generative QA
-- การเปรียบเทียบ baseline กับ finetuned model
-- การประเมินผล
-- การแสดงผลลัพธ์ผ่าน CLI, API หรือหน้าเว็บ
+ชุดข้อมูลและทรัพยากรที่ใช้ในงานนี้ประกอบด้วย 4 ส่วนหลัก
 
-## 2. แนวคิดหลักของระบบ
-
-แนวคิดหลักของโปรเจกต์นี้คือใช้สถาปัตยกรรมแบบ RAG (Retrieval-Augmented Generation)
-
-หลักการคือ:
-
-1. รับคำถามจากผู้ใช้
-2. วิเคราะห์ว่าคำถามกล่าวถึงอาหารประเภทใด สัญชาติอะไร ราคาแบบไหน หรือสถานที่ใด
-3. ไปค้นรีวิวที่เกี่ยวข้องจาก dataset
-4. จัดอันดับรีวิวที่เกี่ยวข้องมากที่สุด
-5. สรุปผลใน 2 ระดับ
-   - ระดับ retrieval summary เพื่อใช้เป็น baseline และเทียบผล retrieval
-   - ระดับ generative QA โดยส่งรีวิวที่ค้นได้เข้า LLM เพื่อสร้างคำตอบที่อ่านง่ายขึ้น
-
-เหตุผลที่ไม่ใช้ LLM ตอบโดยตรงโดยไม่ retrieve รีวิวก่อน เพราะโจทย์กำหนดให้ตอบจากข้อมูล Wongnai review dataset และต้องสามารถอ้างอิงรีวิวรวมถึง star rating ได้ การใช้ retrieval ก่อนจะช่วยให้คำตอบ grounded กับข้อมูลจริงในชุดข้อมูลมากขึ้น
-
-## 3. เหตุผลที่เลือกทำระบบแบบนี้
-
-เหตุผลเชิงวิศวกรรมและเชิงโจทย์มีดังนี้
-
-- Dataset เป็นข้อมูลรีวิวจริงที่กระจายตัวสูงและมีภาษาธรรมชาติหลากหลาย จึงเหมาะกับการทำ semantic retrieval มากกว่าการ match keyword อย่างเดียว
-- คำถามของผู้ใช้มักเป็นคำถามผสม เช่น “ร้านอาหารทะเลแบบไทย ๆ ติดทะเลแถวพัทยา” ซึ่งต้องใช้ทั้งความหมายเชิง semantic และ metadata-aware reranking
-- คำตอบที่ดีไม่ควรแค่คืนรีวิวดิบ แต่ควรสรุปเป็นภาษามนุษย์อ่านง่าย จึงต้องมี generative QA
-- งานต้องแสดง baseline และ finetuned เปรียบเทียบกัน จึงแยกชัดเจนเป็น baseline retrieval กับ finetuned retriever/reranker และเพิ่ม LLM fine-tuning ด้วย LoRA เพื่อให้ส่วน generation ตรงโดเมนมากขึ้น
-
-## 4. ข้อมูลที่ใช้ในโปรเจกต์
-
-ข้อมูลที่ใช้มี 4 กลุ่มหลัก
-
-### 4.1 รีวิวหลัก
+### 3.1 รีวิวหลัก
 
 - `review_dataset/w_review_train.csv`
 
-ไฟล์นี้เป็นแหล่งข้อมูลรีวิวร้านอาหารหลักของระบบ ใช้สร้าง index สำหรับ retrieval และใช้เป็น evidence ตอนสร้างคำตอบ
+ไฟล์นี้เป็นแหล่งข้อมูลรีวิวร้านอาหารหลัก ใช้สร้างดัชนีเอกสารสำหรับ retrieval และใช้เป็น evidence ในขั้นสรุปคำตอบ
 
-### 4.2 พจนานุกรมคำอาหาร
+### 3.2 พจนานุกรมคำศัพท์อาหาร
 
 - `review_dataset/food_dictionary.txt`
 
-ไฟล์นี้ใช้เป็นฐานคำศัพท์เชิงโดเมน เช่น คำเรียกอาหาร ประเภทอาหาร สัญชาติอาหาร หรือคำที่เกี่ยวข้องกับร้านอาหาร ช่วยให้ระบบตรวจจับ signal ในคำถามได้ดีขึ้น
+ใช้เป็นแหล่งคำศัพท์เชิงโดเมนสำหรับดึงคำสำคัญจาก query และ review เช่น ชื่ออาหาร ประเภทอาหาร และคำที่เกี่ยวข้องกับการแนะนำร้านอาหาร
 
-### 4.3 Query labels จาก algorithm
+### 3.3 Query labels จากอัลกอริทึม
 
 - `review_dataset/labeled_queries_by_algo.txt`
 
-ใช้เป็นข้อมูล label กึ่งอัตโนมัติสำหรับสร้าง benchmark, tuning retriever และสร้าง supervised fine-tuning examples
+ใช้เป็นข้อมูลเสริมสำหรับสร้าง benchmark, ดึง frequent query terms และ tuning retriever
 
-### 4.4 Query labels จาก judges
+### 3.4 Query labels จากผู้ประเมิน
 
 - `review_dataset/labeled_queries_by_judges.txt`
 
-ใช้เป็น label ที่มีคุณภาพสูงกว่าฝั่ง algorithm ในการประเมินและช่วยสร้างตัวอย่างสำหรับ tuning/fine-tuning
+ใช้เป็น query labels ที่มีคุณภาพสูงขึ้นสำหรับการประเมินผลและช่วยสร้าง supervised fine-tuning examples
 
-## 5. การเตรียมข้อมูล (Data Preprocessing)
+## 4. การเตรียมข้อมูล
 
-การเตรียมข้อมูลเป็นหัวใจของงานนี้ เพราะคุณภาพของ retrieval และ generation ขึ้นกับความสะอาดและโครงสร้างของข้อมูลอย่างมาก
+การเตรียมข้อมูลเป็นหัวใจของงานนี้ เนื่องจากคุณภาพของ retrieval และ generation ขึ้นกับโครงสร้างของข้อมูลและคุณภาพของ metadata ที่สร้างขึ้น
 
-งาน preprocessing หลักอยู่ใน [wongnai_qa/preprocessing.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/preprocessing.py)
+### 4.1 การทำความสะอาดข้อมูลรีวิว
 
-### 5.1 ขั้นตอน preprocessing รีวิว
+รีวิวถูกอ่านจากไฟล์ CSV และผ่านขั้นตอน normalization เช่น การลบอักขระแฝง การจัดรูปแบบ whitespace และการคัดกรอง record ที่ไม่มีข้อความหรือไม่มี rating ที่ใช้งานได้ ขั้นตอนนี้ช่วยลด noise และทำให้การประมวลผลในขั้นถัดไปมีเสถียรภาพมากขึ้น
 
-ระบบทำขั้นตอนหลักดังนี้
+### 4.2 การแบ่งรีวิวเป็น chunks
 
-1. อ่านข้อมูลรีวิวจากไฟล์ CSV
-2. คัดกรอง record ที่ไม่มีข้อความรีวิวหรือมีค่าที่ใช้ไม่ได้
-3. ทำ normalization ข้อความ เช่น จัดการช่องว่างและฟอร์แมตข้อความ
-4. แยกรีวิวเป็นหน่วยเอกสารที่ใช้ใน retrieval
-5. สร้าง metadata เชิงโดเมนแนบไปกับแต่ละเอกสาร
+เนื่องจากรีวิวแต่ละรายการมีความยาวแตกต่างกัน ระบบจึงใช้ text splitter เพื่อแบ่งรีวิวออกเป็นหลาย chunk โดยกำหนด `chunk_size` และ `chunk_overlap` เพื่อรักษาบริบทของข้อความ วิธีนี้ช่วยให้ retrieval ดึงเฉพาะส่วนที่เกี่ยวข้องของรีวิวได้ดีกว่าการใช้รีวิวเต็มทั้งชิ้น
 
-### 5.2 Metadata ที่สร้าง
+### 4.3 การสร้าง metadata
 
-เอกสารแต่ละชิ้นจะมี metadata เพื่อช่วย retrieval และ reranking เช่น
+สำหรับแต่ละ chunk ระบบสร้าง metadata แนบไว้เพื่อช่วยในขั้น reranking ได้แก่
 
 - `rating`
 - `cuisine`
@@ -105,609 +66,248 @@
 - `location`
 - `known_terms`
 
-เหตุผลที่ต้องสร้าง metadata เพราะคำถามของผู้ใช้จำนวนมากไม่ได้ถามจากข้อความรีวิวล้วน ๆ แต่ถามแบบมีเงื่อนไข เช่น ราคาถูก บรรยากาศดี ติดทะเล หรืออาหารญี่ปุ่น ซึ่ง metadata ช่วยให้ระบบ match เงื่อนไขเหล่านี้ได้แม่นขึ้น
+metadata เหล่านี้ช่วยให้ระบบตอบคำถามเชิงเงื่อนไข เช่น “ติดทะเล”, “ราคาไม่แพง”, “อาหารญี่ปุ่น” ได้แม่นยำกว่าการใช้ semantic similarity เพียงอย่างเดียว
 
-### 5.3 Resource bundle สำหรับวิเคราะห์คำถาม
+### 4.4 การวิเคราะห์คำถามของผู้ใช้
 
-ระบบรวมข้อมูลจาก `food_dictionary.txt`, query labels และชุด tag groups ภายในระบบเพื่อสร้าง resource bundle สำหรับใช้วิเคราะห์ query
+เมื่อผู้ใช้ป้อน query ระบบจะสร้าง `query_profile` ซึ่งประกอบด้วย
 
-สิ่งที่ resource bundle ช่วยได้คือ
+- `normalized_query`
+- `expanded_query`
+- `detected_tags`
+- `query_terms`
+- `query_tokens`
 
-- แยก category ของคำถาม
-- ตรวจจับคำเกี่ยวกับอาหาร สถานที่ ราคา และบรรยากาศ
-- ขยาย query ให้ครอบคลุมคำที่เกี่ยวข้อง
-- เพิ่ม signal สำหรับ scoring ใน retrieval
+การวิเคราะห์ดังกล่าวเป็น hybrid approach ระหว่าง rule-based extraction กับ domain lexicon matching โดยใช้ทั้งคำศัพท์จาก `food_dictionary.txt` และ query labels จาก `labeled_queries_by_algo.txt` และ `labeled_queries_by_judges.txt`
 
-## 6. การวิเคราะห์คำถามของผู้ใช้
+### 4.5 ข้อสังเกตเชิงวิชาการ
 
-ก่อนค้นรีวิว ระบบจะวิเคราะห์ query ก่อนเสมอ โดย logic หลักอยู่ใน [wongnai_qa/preprocessing.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/preprocessing.py)
+ในเวอร์ชันปัจจุบัน query understanding ยังอาศัย domain rules และ keyword groups อยู่พอสมควร จุดแข็งคืออธิบายได้ชัด ควบคุมได้ และเหมาะกับงานต้นแบบเชิงวิจัย ข้อจำกัดคือ coverage ยังขึ้นกับ ontology ที่กำหนดไว้ หาก query ใช้คำพ้องหรือสำนวนที่อยู่นอกชุดคำเดิม อาจทำให้การดึง tag ไม่สมบูรณ์
 
-ผลลัพธ์จากการวิเคราะห์ query ประกอบด้วย
+## 5. การเลือกโมเดล
 
-- ข้อความ query ที่ normalize แล้ว
-- expanded query
-- detected tags แยกเป็นกลุ่ม เช่น cuisine, food_type, ambience, price, location
-- query terms ที่สำคัญ
-- known terms ที่พบจาก dictionary
+### 5.1 โมเดลสำหรับ retrieval
 
-ทำไปทำไม:
+ระบบเลือกใช้ `intfloat/multilingual-e5-large` เป็น embedding model สำหรับแปลง query และ review chunks ให้อยู่ใน semantic vector space เดียวกัน เหตุผลหลัก ได้แก่
 
-- เพื่อให้ retrieval ไม่พึ่ง embedding อย่างเดียว
-- เพื่อเพิ่มความสามารถกับคำถามผสมหลายเงื่อนไข
-- เพื่อรองรับคำถามภาษาไทยที่มีรูปแบบหลากหลาย
+- รองรับหลายภาษา โดยเฉพาะภาษาไทยและภาษาอังกฤษ
+- เหมาะกับงาน semantic retrieval
+- ให้คุณภาพการจับความหมายเชิงบริบทได้ดีในงานค้นคืนข้อความ
 
-## 7. การเลือกโมเดล
+embeddings ถูกเก็บและค้นด้วย Chroma vector database
 
-### 7.1 Embedding model
+### 5.2 โมเดลสำหรับ generation
 
-ใช้ `intfloat/multilingual-e5-large`
+ระบบเลือกใช้ `Qwen/Qwen2.5-7B-Instruct` เป็น base LLM สำหรับสร้างคำตอบเชิงสรุป เนื่องจากเป็น instruction-tuned model ที่รองรับ multilingual use cases และสามารถต่อยอดด้วย LoRA ได้สะดวก
 
-เหตุผล:
+### 5.3 เหตุผลที่ไม่ใช้ LLM ตอบตรงโดยไม่ retrieve ก่อน
 
-- รองรับหลายภาษา
-- ใช้กับภาษาไทยและภาษาอังกฤษได้
-- เหมาะกับ semantic retrieval
-- เป็น pretrained model ที่ทันสมัยพอสำหรับงาน retrieval
+แม้ LLM สามารถสร้างคำตอบที่ลื่นไหลได้ แต่หากไม่มี retrieval ก่อน ระบบจะเสี่ยงต่อ hallucination และอาจตอบไม่ grounded กับข้อมูล Wongnai review dataset Retrieval จึงมีความสำคัญต่อการทำให้คำตอบอ้างอิงจากหลักฐานจริงในชุดข้อมูล
 
-### 7.2 Generation model
+## 6. สถาปัตยกรรมของระบบ
 
-ใช้ `Qwen/Qwen2.5-7B-Instruct`
-
-เหตุผล:
-
-- รองรับการตอบภาษาไทยได้ดี
-- เหมาะกับงานสรุปคำตอบจาก context
-- สามารถต่อยอดด้วย LoRA fine-tuning ได้
-
-## 8. Retrieval pipeline
-
-งาน retrieval อยู่ใน [wongnai_qa/retrieval.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/retrieval.py)
-
-ระบบ retrieval แบ่งออกเป็น 2 แบบ
-
-### 8.1 Baseline retrieval
-
-baseline ใช้แนวคิดตรงไปตรงมา:
-
-1. แปลง query เป็น embedding
-2. ค้นเอกสารจาก vector store ด้วย similarity search
-3. นำผลลัพธ์ที่ได้มาสรุปเป็น baseline answer
-
-ลักษณะของ baseline:
-
-- พึ่ง semantic similarity เป็นหลัก
-- ไม่มี metadata-aware reranking ที่ซับซ้อน
-- ใช้เป็นตัวเปรียบเทียบกับ finetuned retriever
-
-### 8.2 Finetuned retrieval
-
-finetuned retrieval ในโปรเจกต์นี้หมายถึง retriever/reranker ที่ปรับน้ำหนัก scoring ให้เข้ากับโดเมน Wongnai มากขึ้น
-
-แนวคิดคือ:
-
-1. ดึง candidate documents จาก vector search
-2. วิเคราะห์ query ว่าต้องการ signal อะไรบ้าง
-3. คำนวณคะแนนใหม่จากหลายองค์ประกอบ
-4. จัดอันดับเอกสารใหม่ก่อนส่งต่อให้ generation
-
-องค์ประกอบของ scoring function มีอย่างน้อย:
-
-- semantic retrieval score
-- tag match score
-- keyword match score
-- rating signal
-- exact phrase signal
-
-ผลของแนวทางนี้คือรีวิวที่ได้ไม่ใช่แค่ “คล้ายความหมาย” แต่ยัง “ตรงเงื่อนไขโดเมน” มากขึ้น เช่น ถามหาร้านติดทะเล ราคาย่อมเยา และอาหารทะเลพร้อมกัน
-
-### 8.3 Vector store
-
-ระบบใช้ persistent vector store ใน [chroma_db](/abs/path/c:/Users/com/Desktop/NLP/chroma_db)
-
-ทำไปทำไม:
-
-- ไม่ต้อง embed รีวิวใหม่ทุกครั้งที่เปิดระบบ
-- ลดเวลารันหลังจากสร้าง index ครั้งแรก
-- ใช้ซ้ำได้ทั้ง CLI, API และ Streamlit
-
-## 9. Baseline model และ Finetuned model
-
-โจทย์กำหนดให้เปรียบเทียบ baseline model กับ finetuned model
-
-ในโปรเจกต์นี้นิยามดังนี้
-
-### 9.1 Baseline model
-
-- Pure vector retrieval
-- ไม่มี domain-specific reranking ที่ซับซ้อน
-- สรุปคำตอบจากเอกสารที่ retrieve ได้แบบง่าย
-
-### 9.2 Finetuned model
-
-โปรเจกต์นี้มีการ fine-tune อยู่ 2 ระดับ
-
-1. `Finetuned retriever/reranker`
-   - ปรับ scoring weights ของ retrieval จาก labeled queries
-   - ทำให้ retrieval เข้ากับโจทย์ร้านอาหารมากขึ้น
-
-2. `Fine-tuned LLM ด้วย LoRA`
-   - ปรับ LLM ให้ตอบในสไตล์งานนี้ได้ดีขึ้น
-   - ใช้ query/evidence ที่สร้างจาก dataset ของงาน
-
-ดังนั้นถ้าพูดให้ชัด:
-
-- baseline = baseline retrieval
-- finetuned = finetuned retriever + LoRA-tuned LLM ในฝั่ง generation
-
-## 10. การ tune retriever
-
-งาน tune retriever อยู่ใน [wongnai_qa/evaluation.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/evaluation.py) และสคริปต์ [scripts/tune_retriever.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/tune_retriever.py)
-
-### 10.1 ทำอะไร
-
-ระบบสร้าง benchmark จาก labeled queries แล้วทดลองปรับน้ำหนักของ scoring function เพื่อหาชุดน้ำหนักที่ให้ผล retrieval ดีขึ้น
-
-น้ำหนักที่ tune ได้แก่
-
-- rating weight
-- tag weight
-- keyword weight
-- exact phrase weight
-
-### 10.2 ทำไปทำไม
-
-เพราะ vector similarity อย่างเดียวอาจดึงรีวิวที่ “ใกล้เคียง” แต่ไม่ “ตรงโจทย์” พอ โดยเฉพาะคำถามหลายเงื่อนไข การปรับ scoring weights ทำให้ระบบคำนึงถึง signal จาก metadata และคำสำคัญได้ดีขึ้น
-
-### 10.3 ผลลัพธ์ของการ tune
-
-น้ำหนักที่บันทึกไว้ใน [artifacts/tuned_retriever_weights.json](/abs/path/c:/Users/com/Desktop/NLP/artifacts/tuned_retriever_weights.json) คือ
-
-- `rating = 0.05`
-- `tag = 0.45`
-- `keyword = 0.33`
-- `exact = 0.0`
-
-จุดนี้สะท้อนว่าระบบพึ่ง tag และ keyword มากกว่าการ match แบบ exact phrase ในชุดทดลองที่ใช้
-
-## 11. Generative QA
-
-งาน generation อยู่ใน [wongnai_qa/generation.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/generation.py)
-
-ระบบมีการสรุปคำตอบ 2 ระดับ
-
-### 11.1 Retrieval summary
-
-เป็นการสรุปจากเอกสารที่ retrieve ได้โดยไม่เรียก LLM มากนัก ใช้สำหรับ:
-
-- แสดง baseline answer
-- แสดง finetuned retrieval answer
-- ใช้เปรียบเทียบผล retrieval โดยตรง
-
-### 11.2 Generative answer
-
-เมื่อ `include_improved=True` ระบบจะส่งรีวิวที่ retrieve ได้เข้า LLM เพื่อสร้างคำตอบภาษาไทยที่อ่านง่ายขึ้น
-
-prompt ถูกออกแบบให้:
-
-- อ้างอิงจาก evidence เท่านั้น
-- ระบุ star rating ถ้ามี
-- ถ้ามีหลายร้านให้แยกเป็นรายการ
-- หลีกเลี่ยงการแต่งชื่อร้านหรือข้อมูลที่ไม่มีในรีวิว
-
-## 12. การ fine-tune LLM ด้วย LoRA
-
-งานนี้มีการ fine-tune LLM จริงด้วย LoRA/QLoRA โดยใช้โค้ดใน [wongnai_qa/finetuning.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/finetuning.py)
-
-สคริปต์ที่เกี่ยวข้องคือ
-
-- [scripts/build_llm_sft_dataset.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/build_llm_sft_dataset.py)
-- [scripts/train_llm_lora.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/train_llm_lora.py)
-
-### 12.1 ทำอะไร
-
-1. สร้าง SFT dataset จาก query labels และ evidence ที่ retrieve ได้
-2. แปลงให้อยู่ในรูป instruction-response
-3. train LoRA adapter บน `Qwen/Qwen2.5-7B-Instruct`
-4. โหลด adapter กลับมาใช้ใน inference
-
-### 12.2 ทำไปทำไม
-
-LoRA fine-tuning ช่วยให้ LLM:
-
-- ตอบในโดเมนร้านอาหารได้ตรงขึ้น
-- จัดรูปแบบคำตอบได้สม่ำเสมอขึ้น
-- อ้างอิง evidence ได้ดีขึ้น
-- ตอบภาษาไทยเชิงงานนี้ได้ดีขึ้นโดยไม่ต้อง fine-tune ทั้งโมเดล
-
-### 12.3 ข้อดีของ LoRA
-
-- ใช้ทรัพยากรน้อยกว่า full fine-tuning
-- train ได้บน GPU ของผู้พัฒนา
-- เก็บเป็น adapter แยกจาก base model
-- เปรียบเทียบก่อนและหลัง fine-tune ได้ง่าย
-
-### 12.4 Artifact ที่ได้
-
-- SFT dataset: [artifacts/llm_sft_dataset.jsonl](/abs/path/c:/Users/com/Desktop/NLP/artifacts/llm_sft_dataset.jsonl)
-- LoRA adapter: [artifacts/qwen2_5_7b_instruct_lora_adapter](/abs/path/c:/Users/com/Desktop/NLP/artifacts/qwen2_5_7b_instruct_lora_adapter)
-
-ระบบ inference ใน [wongnai_qa/llm.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/llm.py) จะพยายามโหลด adapter นี้อัตโนมัติถ้ามีอยู่
-
-## 13. ชั้น orchestration ของระบบ
-
-งาน orchestration หลักอยู่ใน [wongnai_qa/service.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/service.py)
-
-ไฟล์นี้ทำหน้าที่เป็นแกนกลางของระบบ โดยเชื่อมส่วนต่าง ๆ เข้าด้วยกัน
-
-ลำดับงานหลักใน service:
-
-1. โหลดหรือเตรียม vector store
-2. วิเคราะห์ query
-3. รัน baseline retrieval
-4. รัน finetuned retrieval
-5. สร้าง baseline answer
-6. สร้าง finetuned retrieval answer
-7. ถ้าเปิด generation ให้เรียก LLM เพื่อสร้าง improved answer
-8. serialize เอกสารที่ retrieve ได้เพื่อส่งออกไปยัง API/CLI/UI
-
-ข้อดีของการมี service layer กลางคือ logic หลักไม่กระจายซ้ำในหลาย entrypoint
-
-## 14. API, UI และช่องทางแสดงผล
-
-### 14.1 FastAPI backend
-
-[wongnai_qa/api.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/api.py)
-
-หน้าที่:
-
-- รับ query จาก frontend หรือ client
-- เรียก service layer
-- คืนผลเป็น JSON ที่มีทั้ง baseline, finetuned, improved answer และ retrieved documents
-
-### 14.2 Streamlit UI
-
-[wongnai_qa/ui.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/ui.py)
-
-หน้าที่:
-
-- รับคำถามจากผู้ใช้
-- ส่งคำถามไป backend
-- แสดงผล baseline เทียบกับ finetuned
-- แสดงคำตอบสรุปจาก LLM
-- แสดงรีวิวอ้างอิงพร้อม star rating
-
-### 14.3 CLI
-
-ผ่าน [main.py](/abs/path/c:/Users/com/Desktop/NLP/main.py) และ [wongnai_qa/cli.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/cli.py)
-
-หน้าที่:
-
-- ใช้ทดสอบ query จาก command line
-- เหมาะกับการเดโมหรือ debug โดยไม่ต้องเปิดเว็บ
-
-## 15. Workflow schema ของระบบ
-
-### 15.1 Workflow ภาพรวม
-
-#### Mermaid Diagram
+ระบบถูกออกแบบด้วยสถาปัตยกรรม RAG แบบกึ่งอิงกฎและกึ่งวิเคราะห์ความสัมพันธ์เชิงความหมาย (Hybrid Semantic Search) โดยมีโฟลว์การทำงานดังนี้:
 
 ```mermaid
-flowchart TD
-    U[ผู้ใช้พิมพ์คำถาม] --> I[Streamlit UI / CLI / API Client]
-    I --> A[FastAPI Backend]
-    A --> S[Service Layer]
-    S --> RB[โหลด ResourceBundle]
-    S --> VS[โหลดหรือสร้าง Vector Store]
-    S --> Q[วิเคราะห์ Query]
-    Q --> Q1[Normalize Query]
-    Q --> Q2[Detect Tags]
-    Q --> Q3[Collect Query Terms]
-    Q --> Q4[Build Expanded Query]
-    S --> B[Baseline Retrieval]
-    B --> BS[Baseline Summary]
-    S --> F[Finetuned Retrieval]
-    F --> FR[Metadata-aware Reranking]
-    FR --> FS[Finetuned Retrieval Summary]
-    FS --> G[Generative QA]
-    G --> L[LLM + LoRA Adapter]
-    L --> R[คำตอบสุดท้าย]
-    B --> R
-    F --> R
-    R --> O[แสดงคำตอบ + รีวิวอ้างอิง + Star Rating]
+graph TD
+    User([User Query]) --> Analyzer[Query Analyzer]
+    
+    subgraph Data Processing
+        CSV(Wongnai Reviews) --> Chunking
+        Chunking --> Extractor[Metadata Extractor]
+        Extractor --> Embedding[E5-large Embedding]
+        Embedding --> Chroma[(ChromaDB)]
+    end
+    
+    subgraph Retrieval Pipeline
+        Analyzer --> |Expanded Query| Search[Chroma Similarity Search]
+        Chroma --> |Fetch K Candidates| Search
+        Search --> Rerank[Custom Scoring & Reranking]
+        Rerank --> |Top-K Evidences| LLM
+    end
+    
+    subgraph Generation Pipeline
+        LLM{Qwen2.5-7B + LoRA\nGenerator} --> Output([Final Answer])
+    end
 ```
 
-#### ASCII Diagram
+1. รับคำถามจากผู้ใช้
+2. วิเคราะห์ query เพื่อสร้าง `query_profile` แบบละเอียด
+3. ค้นคืนรีวิวที่เกี่ยวข้องเบื้องต้น (fetch_k) จาก vector store ด้วย `expanded_query`
+4. **Baseline Retrieval:** สร้างผลลัพธ์จาก top-k ที่เรียงลำดับด้วย semantic similarity เพียงอย่างเดียว
+5. **Finetuned Retrieval:** นำ candidate documents มา rerank ใหม่ด้วยสูตรการให้คะแนนเชิงโดเมน
+6. **Generation:** ส่งข้อมูลแวดล้อมกลับไปให้ LLM สรุปคำตอบภาษาไทยพร้อม citation และ rating 
+7. ส่งออกคำตอบที่ลดอัตราการเป็น Hallucination กลับไปยังผู้ใช้
 
+## 7. Baseline model
+
+baseline model ในงานนี้หมายถึง pure dense retrieval โดยใช้ `normalized_query` ค้นใน Chroma vector store ด้วย semantic similarity จากนั้นคัด top-k review chunks ที่ใกล้เคียงที่สุด และสรุปเป็นรายการรีวิวพร้อม `rating`, `tags` และ `excerpt`
+
+ข้อดีของ baseline คือโครงสร้างเรียบง่ายและให้ผลลัพธ์ได้สม่ำเสมอในหลายกรณี ข้อเสียคืออาจดึงเอกสารที่คล้ายในเชิง semantic แต่ไม่ตรงกับเงื่อนไขสำคัญของคำถาม เช่น cuisine, location หรือ price
+
+## 8. Finetuned model
+
+คำว่า “finetuned” ในงานนี้มี 2 ระดับ ได้แก่ retriever side และ generator side
+
+### 8.1 Finetuned retrieval
+
+retriever ไม่ได้ fine-tune embedding model ใหม่โดยตรง แต่ใช้วิธีปรับ retrieval pipeline (Late Interaction & Re-ranking) ดังนี้
+
+1. ใช้ `expanded_query` แทน query เดิม
+2. ดึง candidate documents ด้วย dense retrieval (fetch_k = 12 ถึง 16)
+3. **Reranking Phase:** นำ candidate มาให้คะแนนใหม่ด้วยสมการการให้คะแนนที่คำนึงถึง Metadata ดังนี้:
+
+   > **Score** = $(\text{Rating}/5 \times W_{rating}) + (\text{TagRatio} \times W_{tag}) + (\text{KeywordRatio} \times W_{keyword}) + (\text{ExactHit} \times W_{exact}) - \text{Penalty}$
+
+   โดยที่ $W$ คือค่าน้ำหนักที่ผ่านการ tune (Grid Search) จาก Labeled queries:
+   - $W_{rating} = 0.05$ : น้ำหนักจากดาวร้านอาหาร
+   - $W_{tag} = 0.80$ : คะแนนสัดส่วน tag (cuisine, ambience) ที่ตรงคำถาม
+   - $W_{keyword} = 1.00$ : คะแนนการพบคำสำคัญ
+   - $W_{exact} = 0.20$ : คะแนนการพบวลีเดิมซ้ำเป๊ะ
+   - **Conflict Penalty**: ลงโทษคะแนนติดลบ (-0.55 ถึง -0.25) กรณีเงื่อนไขราคาหรือสถานที่ขัดแย้งกันอย่างสิ้นเชิง
+
+ดังนั้น `finetuned retrieval` ในงานนี้จึงเป็นตัวแทนของกระบวนการ **Dense Retrieval + Query Expansion + Tuned Metadata Reranking**
+
+### 8.2 Fine-tuned LLM ด้วย LoRA
+
+ในฝั่ง generation ระบบสร้าง SFT dataset จาก query และ evidence ที่ดึงจากรีวิว แล้วใช้ LoRA fine-tune `Qwen2.5-7B-Instruct` เพื่อให้คำตอบเชิงสรุปสอดคล้องกับโดเมนร้านอาหารมากขึ้น
+
+**ตัวอย่าง Prompt Template สำหรับ Instruction Tuning:**
 ```text
-ผู้ใช้พิมพ์คำถาม
-        |
-        v
-Streamlit UI / CLI / API Client
-        |
-        v
-FastAPI Backend
-        |
-        v
-Service Layer
-        |
-        +--> โหลด ResourceBundle และ Vector Store
-        |
-        +--> วิเคราะห์ Query
-        |      - normalize query
-        |      - detect tags
-        |      - collect query terms
-        |      - build expanded query
-        |
-        +--> Baseline Retrieval
-        |      - embedding similarity search
-        |
-        +--> Finetuned Retrieval
-        |      - similarity search
-        |      - metadata-aware scoring
-        |      - reranking
-        |
-        +--> Baseline Summary
-        |
-        +--> Finetuned Retrieval Summary
-        |
-        +--> Generative QA
-               - ส่ง evidence เข้า LLM
-               - ใช้ LoRA adapter ถ้ามี
-        |
-        v
-ส่งคำตอบกลับ
-        |
-        v
-แสดงคำตอบ + รีวิวอ้างอิง + star rating
+คุณเป็นผู้ช่วยแนะนำร้านอาหารจากรีวิว Wongnai
+จงตอบเป็นภาษาไทย โดยใช้ข้อมูลจากรีวิวที่ให้มาเท่านั้น
+ถ้ามีหลายตัวเลือกให้ตอบเป็นข้อ และระบุ rating ทุกข้อ
+ถ้าข้อมูลยังไม่ชัด ให้บอกว่าหลักฐานมีจำกัด
+
+คำถาม:
+{question}
+
+ข้อมูลรีวิว:
+{context}
+
+คำตอบ:
 ```
 
-### 15.2 Workflow การสร้าง index
+การทำ Instruction tuning บนเป้าหมายเฉพาะงาน ช่วยบังคับพฤติกรรมของ LLM ในเชิงลึก ได้แก่:
+- ตอบเป็นภาษาไทยอย่างเป็นธรรมชาติ
+- **Grounded Answer**: ใช้เฉพาะ evidence ที่ให้มา
+- ระบุดาว (rating) ของตัวเลือกที่แนะนำ
+- เลี่ยงการแต่งเติมสถานที่ตั้ง หรือราคาเพิ่มเติมที่ไม่มีในรีวิว (Hallucination mitigation)
 
-#### Mermaid Diagram
+## 9. การสร้าง SFT dataset และการ fine-tune โมเดล
 
-```mermaid
-flowchart TD
-    C1[โหลดรีวิวจาก CSV] --> C2[ทำ Preprocessing]
-    C2 --> C3[สร้าง Metadata]
-    C3 --> C4[Embed เอกสาร]
-    C4 --> C5[เก็บลง Chroma Vector Store]
-    C5 --> C6[Persist ลง chroma_db]
-```
+กระบวนการสร้าง SFT dataset ประกอบด้วย
 
-#### ASCII Diagram
+1. เลือก query จาก labeled query set (Benchmark limit: 64 queries)
+2. retrieve evidence ด้วยระบบ `finetuned retrieval` (Top-K=4 docs)
+3. รวบรวมข้อมูลเป็น Prompt-Response pair โดยกำหนดกฎการตอบที่ชัดเจน 
+4. บันทึกผลลัพธ์เป็นโครงสร้าง JSONL (`llm_sft_dataset.jsonl`) ก่อนโหลดด้วยไลบรารี Datasets
 
-```text
-โหลดรีวิวจาก CSV
-    |
-    v
-ทำ preprocessing
-    |
-    v
-สร้าง metadata ของแต่ละเอกสาร
-    |
-    v
-embed เอกสาร
-    |
-    v
-เก็บลง Chroma vector store
-    |
-    v
-persist ลง chroma_db
-```
+**การกำหนด Hyperparameters เชิงลึกของการฝึก:**
+ในการประหยัดทรัพยากร vRAM การฝึกใช้เทคนิค QLoRA ด้วย **4-bit Normal Float (NF4)** Quantization คู่กับ BitsAndBytes ร่วมกับตาราง Configuration ดังนี้:
 
-### 15.3 Workflow การ tune retriever
+| Parameter | Value | Remark |
+| :--- | :--- | :--- |
+| **LoRA Rank ($r$)** | 16 | Rank ขนาดกลาง สมดุลกับความจำบนชั้น projection |
+| **LoRA Alpha** | 32 | ตัวคูณขยายค่าน้ำหนัก |
+| **Target Modules** | All Projections | `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate`, `up`, `down` |
+| **Batch Size** | 1 (Grad Accum=8) | Effective Batch Size คือ 8 รองรับ GPU memory จำกัด |
+| **Learning Rate** | 2e-4 | ใช้อัลกอริทึม Paged AdamW 8-bit optimizer |
+| **Max Sequence** | 1,024 Tokens | ตัดบริบทตามความยาวสูงสุดที่ให้ model ประมวลผล |
+| **Epochs** | 1 | |
 
-#### Mermaid Diagram
+ข้อดีของการทำ Parameter-Efficient Fine-Tuning (PEFT) วิธีนี้คือ ปรับน้ำหนักไม่เกินร้อยละ 1 ของพารามิเตอร์เต็ม (7 Billion) ทำให้สามารถใช้ Consumer GPU หน่วยความจำ 24GB ฝึกเสร็จภายในเวลาไม่ถึง 1 ชั่วโมง แต่ได้พฤติกรรมการตอบที่รัดกุมระดับเดียวกับ Full Fine-tuning ในบริบทที่เจาะจง
 
-```mermaid
-flowchart TD
-    T1[โหลด labeled queries] --> T2[สร้าง benchmark examples]
-    T2 --> T3[ทดลองหลายชุด scoring weights]
-    T3 --> T4[คำนวณ hit_rate_at_k]
-    T3 --> T5[คำนวณ avg_relevant_ratio_at_k]
-    T4 --> T6[เลือก weights ที่ดีที่สุด]
-    T5 --> T6
-    T6 --> T7[บันทึก tuned_retriever_weights.json]
-```
+## 10. การวัดผลการทำงาน
 
-#### ASCII Diagram
+### 10.1 Retrieval evaluation
 
-```text
-โหลด labeled queries
-    |
-    v
-สร้าง benchmark examples
-    |
-    v
-ลองชุด scoring weights หลายแบบ
-    |
-    v
-วัด hit_rate_at_k และ avg_relevant_ratio_at_k
-    |
-    v
-เลือกน้ำหนักที่ดีที่สุด
-    |
-    v
-บันทึกลง artifacts/tuned_retriever_weights.json
-```
-
-### 15.4 Workflow การ fine-tune LLM
-
-#### Mermaid Diagram
-
-```mermaid
-flowchart TD
-    L1[โหลด labeled queries] --> L2[Retrieve evidence จาก dataset]
-    L2 --> L3[สร้าง instruction-response examples]
-    L3 --> L4[บันทึกเป็น SFT dataset]
-    L4 --> L5[Train LoRA adapter บน Qwen2.5-7B-Instruct]
-    L5 --> L6[บันทึก adapter ลง artifacts/qwen2_5_7b_instruct_lora_adapter]
-    L6 --> L7[โหลด adapter ใน inference]
-```
-
-#### ASCII Diagram
-
-```text
-โหลด labeled queries
-    |
-    v
-retrieve evidence จาก dataset
-    |
-    v
-สร้าง instruction-response examples
-    |
-    v
-บันทึกเป็น SFT dataset
-    |
-    v
-train LoRA adapter บน Qwen2.5-7B-Instruct
-    |
-    v
-บันทึก adapter ลง artifacts/qwen2_5_7b_instruct_lora_adapter
-    |
-    v
-โหลด adapter ใน inference
-```
-
-## 16. ไฟล์สำคัญและหน้าที่ของแต่ละไฟล์
-
-### 16.1 Package หลัก
-
-- [wongnai_qa/config.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/config.py): ค่าตั้งต้นของระบบ path model path artifacts และชุดคำถามตัวอย่าง
-- [wongnai_qa/preprocessing.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/preprocessing.py): โหลดข้อมูลรีวิว สร้าง resource bundle เตรียม metadata และวิเคราะห์ query
-- [wongnai_qa/retrieval.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/retrieval.py): embeddings, vector store, baseline retrieval, finetuned retrieval และ scoring weights
-- [wongnai_qa/generation.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/generation.py): สร้าง baseline summary และ prompt สำหรับ generative QA
-- [wongnai_qa/llm.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/llm.py): โหลด base model และ LoRA adapter สำหรับ inference
-- [wongnai_qa/service.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/service.py): orchestration layer หลักของระบบ
-- [wongnai_qa/api.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/api.py): FastAPI backend
-- [wongnai_qa/ui.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/ui.py): logic ของ Streamlit UI
-- [wongnai_qa/evaluation.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/evaluation.py): benchmark, tuning และ evaluation
-- [wongnai_qa/finetuning.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/finetuning.py): สร้าง SFT dataset และ train LoRA adapter
-
-### 16.2 Scripts
-
-- [scripts/tune_retriever.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/tune_retriever.py): tune น้ำหนักของ finetuned retriever
-- [scripts/evaluate_models.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/evaluate_models.py): วัดผล baseline เทียบ finetuned
-- [scripts/run_assignment_demo.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/run_assignment_demo.py): รัน query ตัวอย่างครบ 5 หมวดตามโจทย์
-- [scripts/build_llm_sft_dataset.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/build_llm_sft_dataset.py): สร้าง supervised fine-tuning dataset สำหรับ LLM
-- [scripts/train_llm_lora.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/train_llm_lora.py): train LoRA adapter สำหรับ Qwen2.5-7B-Instruct
-
-## 17. การประเมินผล (Evaluation)
-
-งานประเมินผลอยู่ใน [wongnai_qa/evaluation.py](/abs/path/c:/Users/com/Desktop/NLP/wongnai_qa/evaluation.py) และสคริปต์ [scripts/evaluate_models.py](/abs/path/c:/Users/com/Desktop/NLP/scripts/evaluate_models.py)
-
-### 17.1 Metric ที่ใช้
-
-อย่างน้อยใช้ metric ดังนี้
+ระบบใช้ metric หลัก ได้แก่
 
 - `hit_rate_at_k`
 - `avg_relevant_ratio_at_k`
 
-### 17.2 นิยาม relevance
+ทั้งสอง metric ใช้วัดว่าผล retrieval มีความเกี่ยวข้องกับ query มากเพียงใด โดยอาศัย pseudo relevance จากการ match ระหว่าง query_profile กับ metadata และข้อความในเอกสาร
 
-ในโปรเจกต์นี้ relevance นิยามแบบ pseudo-label โดยอิงจาก
+### 10.2 Comparative evaluation
 
-- metadata tags ที่ตรงกับ query
-- query terms ที่ match กับเอกสาร
-- known terms และ domain signals ที่สอดคล้องกัน
+มีการประเมิน baseline เทียบกับ finetuned retrieval โดยใช้ benchmark ที่สร้างจาก labeled queries จากทั้งฝั่ง algorithm และ judges เพื่อดูว่าการเพิ่ม query expansion และ metadata-aware reranking ช่วยเพิ่มคุณภาพการ retrieve ได้หรือไม่
 
-### 17.3 ทำไปทำไม
+### 10.3 ข้อจำกัดของการประเมิน
 
-เพราะ dataset ไม่ได้มี gold relevance labels ครบทุก query จึงต้องใช้แนวทางประเมินแบบ heuristic/pseudo-supervision เพื่อให้สามารถเปรียบเทียบ baseline กับ finetuned ได้ในเชิงระบบ
+ระบบยังไม่มี gold relevance labels ครบทุก query การประเมินจึงยังอยู่ในลักษณะ heuristic/pseudo-supervision มากกว่าการประเมินด้วย human-annotated benchmark เต็มรูปแบบ อย่างไรก็ดี วิธีดังกล่าวยังเพียงพอสำหรับการเปรียบเทียบเชิงระบบในงานวิชาการระดับต้นแบบ
 
-## 18. ผลการทดลองที่มีในโปรเจกต์ปัจจุบัน
+## 11. การอภิปรายผล
 
-artifact ที่มีอยู่แล้วในโปรเจกต์:
+baseline retrieval มักให้ผลลัพธ์ได้ง่ายกว่าเพราะใช้ semantic similarity เป็นหลัก แต่มีโอกาสได้รีวิวที่ไม่ตรงกับเงื่อนไขย่อยของ query มากนัก เช่น location หรือ cuisine ขณะที่ finetuned retrieval มีแนวโน้มตอบโจทย์ query ที่มีหลายเงื่อนไขได้ดีกว่า เพราะมี query expansion และ reranking จาก metadata เข้ามาช่วย อย่างไรก็ตาม หาก query ระบุเงื่อนไขเฉพาะมากและ dataset ไม่มี evidence ที่ตรงจริง ระบบ finetuned อาจเลือกตอบว่า “ไม่พบข้อมูล” แทนการแนะนำผิด ซึ่งถือเป็นแนวทาง conservative ที่เหมาะกับงานที่ต้องการ grounded answer
 
-- [artifacts/tuned_retriever_weights.json](/abs/path/c:/Users/com/Desktop/NLP/artifacts/tuned_retriever_weights.json)
-- [artifacts/tune_result.json](/abs/path/c:/Users/com/Desktop/NLP/artifacts/tune_result.json)
-- [artifacts/eval_result.json](/abs/path/c:/Users/com/Desktop/NLP/artifacts/eval_result.json)
-- [artifacts/assignment_demo.json](/abs/path/c:/Users/com/Desktop/NLP/artifacts/assignment_demo.json)
-- [artifacts/llm_sft_dataset.jsonl](/abs/path/c:/Users/com/Desktop/NLP/artifacts/llm_sft_dataset.jsonl)
-- [artifacts/qwen2_5_7b_instruct_lora_adapter](/abs/path/c:/Users/com/Desktop/NLP/artifacts/qwen2_5_7b_instruct_lora_adapter)
+## 12. ผลการทดสอบด้วยคำถาม 5 หมวด
 
-ผลที่ได้ในรอบทดลองที่มีการบันทึกไว้:
+ส่วนนี้สามารถเติมผลจริงจาก `artifacts/assignment_demo.json` ภายหลังได้
 
-- สามารถ tune retriever และบันทึก weights ได้จริง
-- สามารถ evaluate baseline เทียบ finetuned ได้จริง
-- สามารถรัน demo query ครบ 5 หมวดตามโจทย์ได้จริง
-- สามารถสร้าง SFT dataset ได้จริง
-- สามารถ train LoRA adapter บน GPU ได้จริง
-- สามารถโหลด adapter กลับมาใช้ใน inference ได้จริง
+### 12.1 คำถามด้านสัญชาติอาหาร
 
-## 19. วิธีใช้งานระบบ
+คำถาม: `[ใส่คำถามจริง]`  
+ผล baseline: `[ใส่ผลลัพธ์ baseline]`  
+ผล finetuned: `[ใส่ผลลัพธ์ finetuned]`  
+วิเคราะห์ผล: `[อธิบายว่า finetuned ครอบคลุม cuisine ได้ดีกว่า baseline หรือไม่]`
 
-### 19.1 รัน backend
+### 12.2 คำถามด้านประเภทอาหาร
 
-```powershell
-uv run uvicorn main:app --host 127.0.0.1 --port 8001
-```
+คำถาม: `[ใส่คำถามจริง]`  
+ผล baseline: `[ใส่ผลลัพธ์ baseline]`  
+ผล finetuned: `[ใส่ผลลัพธ์ finetuned]`  
+วิเคราะห์ผล: `[อธิบายว่าผลลัพธ์ตรงกับ food type ที่ผู้ใช้ต้องการมากน้อยเพียงใด]`
 
-### 19.2 รัน Streamlit
+### 12.3 คำถามด้านบรรยากาศและราคา
 
-```powershell
-uv run streamlit run streamlit_app.py
-```
+คำถาม: `[ใส่คำถามจริง]`  
+ผล baseline: `[ใส่ผลลัพธ์ baseline]`  
+ผล finetuned: `[ใส่ผลลัพธ์ finetuned]`  
+วิเคราะห์ผล: `[อธิบายว่าระบบจับ ambience และ price ได้ดีเพียงใด]`
 
-### 19.3 รันผ่าน CLI
+### 12.4 คำถามด้านสถานที่ตั้ง
 
-```powershell
-uv run python main.py --query "อาหารทะเลแบบไทยๆ ติดชายหาดแถวพัทยา"
-```
+คำถาม: `[ใส่คำถามจริง]`  
+ผล baseline: `[ใส่ผลลัพธ์ baseline]`  
+ผล finetuned: `[ใส่ผลลัพธ์ finetuned]`  
+วิเคราะห์ผล: `[อธิบายว่าระบบรักษาเงื่อนไขด้าน location ได้มากน้อยเพียงใด]`
 
-### 19.4 Tune retriever
+### 12.5 คำถามแบบผสมหลายเงื่อนไข
 
-```powershell
-uv run python scripts/tune_retriever.py
-```
+คำถาม: `[ใส่คำถามจริง]`  
+ผล baseline: `[ใส่ผลลัพธ์ baseline]`  
+ผล finetuned: `[ใส่ผลลัพธ์ finetuned]`  
+วิเคราะห์ผล: `[อธิบายการทำงานเมื่อ query มีหลายเงื่อนไขพร้อมกัน]`
 
-### 19.5 Evaluate baseline vs finetuned
+## 13. ข้อดีของงาน
 
-```powershell
-uv run python scripts/evaluate_models.py
-```
+- ใช้ข้อมูลตามโจทย์จริงจาก Wongnai review dataset
+- ใช้ทั้ง retrieval และ generative QA
+- มี baseline และ finetuned เปรียบเทียบกันอย่างชัดเจน
+- ใช้ pretrained multilingual model ที่ทันสมัย
+- มี pipeline สำหรับ preprocessing, tuning, evaluation และ fine-tuning
+- แสดงผลลัพธ์พร้อม star rating
+- รองรับการใช้งานผ่าน CLI, API และ web interface
 
-### 19.6 รันชุด query ครบ 5 หมวด
+## 14. ข้อจำกัดของงาน
 
-```powershell
-uv run python scripts/run_assignment_demo.py
-```
+- query understanding ยังพึ่ง rule-based ontology ในบางส่วน
+- coverage ของ tag ยังขึ้นกับ domain rules ที่ออกแบบไว้
+- evaluation ยังอาศัย pseudo labels เป็นหลัก
+- local generation ด้วย LLM ใช้เวลาค่อนข้างมาก
+- หาก query มีเงื่อนไขเฉพาะมาก แต่ dataset ไม่มี evidence ตรง ระบบอาจตอบไม่พบข้อมูล
 
-### 19.7 สร้าง SFT dataset
+## 15. แนวทางพัฒนาต่อ
 
-```powershell
-uv run python scripts/build_llm_sft_dataset.py
-```
+1. ใช้ LLM ช่วยทำ structured query understanding แทน rule-based บางส่วน
+2. เพิ่ม hybrid retrieval เช่น dense + BM25
+3. สร้าง benchmark ที่มี human relevance labels
+4. ปรับปรุง metadata extraction จากรีวิวให้แม่นยำขึ้น
+5. เพิ่ม citation หรือ evidence attribution ในคำตอบ generation
 
-### 19.8 Train LoRA adapter
+## 16. สรุป
 
-```powershell
-uv run python scripts/train_llm_lora.py
-```
+งานนี้นำเสนอระบบถามตอบและแนะนำร้านอาหารจากข้อมูลรีวิว Wongnai โดยอาศัยแนวคิด RAG เป็นแกนหลัก และผสาน semantic retrieval, metadata-aware reranking และ LLM-based generation เข้าด้วยกัน ระบบ baseline ใช้ pure dense retrieval ขณะที่ระบบ finetuned ใช้การวิเคราะห์ query และ tuned reranking เพื่อเพิ่มความสอดคล้องกับโดเมน นอกจากนี้ยังมีการ fine-tune LLM ด้วย LoRA เพื่อให้การสร้างคำตอบมีลักษณะเฉพาะงานมากขึ้น
 
-## 20. ข้อดีของระบบที่พัฒนา
-
-- ใช้ dataset ตามโจทย์จริง
-- ใช้ทั้ง review data, food dictionary และ labeled queries
-- รองรับ retrieval และ generative QA
-- เปรียบเทียบ baseline กับ finetuned ได้
-- แสดง star rating ในผลลัพธ์
-- มี pipeline tuning, evaluation และ fine-tuning
-- มีช่องทางใช้งานทั้ง CLI, API และ Streamlit
-- มี artifacts และผลรันจริงรองรับ
-
-## 21. ข้อจำกัดของระบบ
-
-- คุณภาพ retrieval และ generation ยังขึ้นกับคุณภาพ metadata และ query labels
-- evaluation ปัจจุบันยังอาศัย pseudo-label เป็นหลัก
-- การรัน generative QA แบบ local ใช้เวลาพอสมควร โดยเฉพาะเมื่อเปิด LLM พร้อม LoRA adapter
-- หากย้ายไปเครื่องใหม่ที่ไม่มี model cache หรือ artifacts อาจต้องดาวน์โหลดหรือสร้างใหม่บางส่วน
-- ถ้าข้อมูลรีวิวไม่มีชื่อร้านชัดเจน คำตอบอาจอ้างอิงเป็นลักษณะ “ตัวเลือก” มากกว่าชื่อร้านเฉพาะ
-
-## 22. สรุป
-
-โปรเจกต์นี้พัฒนาระบบถามตอบเกี่ยวกับอาหารและร้านอาหารจากข้อมูล Wongnai review dataset โดยใช้แนวทาง RAG เป็นแกนหลัก ผสมทั้ง semantic retrieval, metadata-aware reranking, abstractive generation และ LoRA fine-tuning ของ LLM
-
-สิ่งที่ทำในงานนี้ไม่ใช่เพียงการค้นรีวิวแล้วแสดงผล แต่เป็นการสร้าง pipeline เต็มรูปแบบตั้งแต่ preprocessing, query understanding, retrieval, reranking, summarization, evaluation, retriever tuning และ LLM fine-tuning พร้อมเอกสารและ artifact ที่ใช้งานได้จริง
-
-ในเชิงโจทย์ งานนี้ครอบคลุมทั้ง 5 หมวดคำถามหลัก แสดง baseline เทียบกับ finetuned model ได้ มีการระบุ star rating ในผลลัพธ์ มีรายงานอธิบายการทำงาน และมีช่องทางสาธิตการทำงานจริงผ่าน Streamlit, FastAPI และ CLI
+ในเชิงวิชาการ งานนี้ชี้ให้เห็นว่าการเตรียมข้อมูล การออกแบบ metadata และการใช้ domain signals ส่งผลต่อคุณภาพของระบบ NLP อย่างมีนัยสำคัญ โดยเฉพาะเมื่อ query ของผู้ใช้มีหลายเงื่อนไขพร้อมกัน แม้งานยังมีข้อจำกัดด้าน coverage และ evaluation แต่ถือเป็นต้นแบบที่มีโครงสร้างครบถ้วนและสามารถต่อยอดเป็นงานวิจัยระดับสูงขึ้นได้
