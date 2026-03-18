@@ -20,6 +20,7 @@ class QueryRequest(BaseModel):
     top_k: int = Field(default=RETRIEVER_K, ge=1, le=10)
     fetch_k: int = Field(default=RETRIEVER_FETCH_K, ge=1, le=30)
     include_improved: bool = True
+    improved_mode: str = Field(default="both", pattern="^(both|baseline|finetuned)$")
     rebuild: bool = False
 
 
@@ -28,7 +29,8 @@ class QueryResponseModel(BaseModel):
     query_profile: dict
     baseline_answer: str
     finetuned_answer: str
-    improved_answer: str | None
+    baseline_improved_answer: str | None
+    finetuned_improved_answer: str | None
     baseline_retrieved_documents: list[dict]
     retrieved_documents: list[dict]
 
@@ -52,6 +54,7 @@ def query(payload: QueryRequest) -> QueryResponseModel:
         top_k=payload.top_k,
         fetch_k=payload.fetch_k,
         include_improved=payload.include_improved,
+        improved_mode=payload.improved_mode,
         rebuild=payload.rebuild,
     )
     return QueryResponseModel(
@@ -59,7 +62,8 @@ def query(payload: QueryRequest) -> QueryResponseModel:
         query_profile=result.query_profile,
         baseline_answer=result.baseline_answer,
         finetuned_answer=result.finetuned_answer,
-        improved_answer=result.improved_answer,
+        baseline_improved_answer=result.baseline_improved_answer,
+        finetuned_improved_answer=result.finetuned_improved_answer,
         baseline_retrieved_documents=result.baseline_retrieved_documents,
         retrieved_documents=result.retrieved_documents,
     )

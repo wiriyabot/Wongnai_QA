@@ -47,9 +47,15 @@ def main() -> None:
         print("Finetuned retriever")
         print(result.finetuned_answer)
         print("-" * 80)
-        if result.improved_answer is None:
+        if (
+            result.baseline_improved_answer is None
+            or result.finetuned_improved_answer is None
+        ):
             print("Generative answer: skipped (--skip-llm)")
         else:
+            print("Generative answer from baseline retrieval")
+            print(result.baseline_improved_answer)
+            print("-" * 80)
             print("Generative answer from finetuned retrieval")
-            print(result.improved_answer)
+            print(result.finetuned_improved_answer)
         print("")

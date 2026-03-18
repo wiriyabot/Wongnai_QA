@@ -22,7 +22,8 @@ class QueryResponse:
     query_profile: dict[str, Any]
     baseline_answer: str
     finetuned_answer: str
-    improved_answer: str | None
+    baseline_improved_answer: str | None
+    finetuned_improved_answer: str | None
     baseline_retrieved_documents: list[dict[str, Any]]
     retrieved_documents: list[dict[str, Any]]
 
@@ -37,7 +38,25 @@ class WongnaiQAService:
 
     def ensure_vector_store(self, rebuild: bool = False):
         with self._lock:
-            if rebuild or self._vector_store is None or not vector_store_is_current(self.sample_size):
+            if rebuild:
+                documents = load_and_preprocess_data(sample_size=self.sample_size)
+                self._vector_store = get_vector_store(
+                    documents=documents,
+                    sample_size=self.sample_size,
+                )
+            elif self._vector_store is None:
+                if vector_store_is_current(self.sample_size):
+                    self._vector_store = get_vector_store(
+                        documents=None,
+                        sample_size=self.sample_size,
+                    )
+                else:
+                    documents = load_and_preprocess_data(sample_size=self.sample_size)
+                    self._vector_store = get_vector_store(
+                        documents=documents,
+                        sample_size=self.sample_size,
+                    )
+            elif not vector_store_is_current(self.sample_size):
                 documents = load_and_preprocess_data(sample_size=self.sample_size)
                 self._vector_store = get_vector_store(
                     documents=documents,
@@ -57,6 +76,7 @@ class WongnaiQAService:
         top_k: int = RETRIEVER_K,
         fetch_k: int = RETRIEVER_FETCH_K,
         include_improved: bool = True,
+        improved_mode: str = "both",
         rebuild: bool = False,
     ) -> QueryResponse:
         vector_store = self.ensure_vector_store(rebuild=rebuild)
@@ -79,10 +99,29 @@ class WongnaiQAService:
             "Baseline answer",
             "Finetuned retrieval answer",
             1,
+        ).replace(
+            "Baseline:",
+            "Finetuned retrieval:",
+            1,
         )
-        improved_answer = None
+        baseline_improved_answer = None
+        finetuned_improved_answer = None
         if include_improved:
-            improved_answer = build_rag_answer(question, finetuned_documents, self.ensure_llm())
+            if improved_mode not in {"both", "baseline", "finetuned"}:
+                raise ValueError(f"Unsupported improved_mode: {improved_mode}")
+            llm = self.ensure_llm()
+            if improved_mode in {"both", "baseline"}:
+                baseline_improved_answer = build_rag_answer(question, baseline_documents, llm).replace(
+                    "Improved answer",
+                    "Baseline improved answer",
+                    1,
+                )
+            if improved_mode in {"both", "finetuned"}:
+                finetuned_improved_answer = build_rag_answer(question, finetuned_documents, llm).replace(
+                    "Improved answer",
+                    "Finetuned improved answer",
+                    1,
+                )
 
         serialized_baseline_documents = [
             {
@@ -104,7 +143,8 @@ class WongnaiQAService:
             query_profile=query_profile,
             baseline_answer=baseline_answer,
             finetuned_answer=finetuned_answer,
-            improved_answer=improved_answer,
+            baseline_improved_answer=baseline_improved_answer,
+            finetuned_improved_answer=finetuned_improved_answer,
             baseline_retrieved_documents=serialized_baseline_documents,
             retrieved_documents=serialized_documents,
         )

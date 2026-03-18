@@ -40,6 +40,7 @@ TEXT_CONTRADICTION_HINTS = {
     ("price", "expensive"): ["ถูก", "ไม่แพง", "ย่อมเยา", "ประหยัด", "คุ้ม"],
     ("ambience", "quiet"): ["คนเยอะ", "แน่น", "เสียงดัง", "วุ่นวาย", "พลุกพล่าน"],
 }
+STRICT_MATCH_GROUPS = ("cuisine", "food_type", "location")
 
 
 @dataclass(frozen=True)
@@ -261,14 +262,72 @@ def _prioritize_matching_documents(
     query_profile: dict[str, Any],
     k: int,
 ) -> list[Document]:
+    has_strict_requirements = any(query_profile["detected_tags"].get(group) for group in STRICT_MATCH_GROUPS)
+    requested_locations = set(query_profile["detected_tags"].get("location", []))
     matched: list[Document] = []
+    strict_only: list[Document] = []
     fallback: list[Document] = []
     for document in documents:
-        if document_matches_query(document, query_profile):
+        strict_ok = _passes_strict_constraints(document, query_profile)
+        if strict_ok and document_matches_query(document, query_profile):
             matched.append(document)
+        elif strict_ok:
+            strict_only.append(document)
         else:
             fallback.append(document)
-    return _deduplicate_documents(matched + fallback, k=k)
+    if has_strict_requirements:
+        strict_ranked = _deduplicate_documents(matched + strict_only, k=k)
+        if strict_ranked:
+            return strict_ranked
+        # If strict filtering found nothing, try candidates that still overlap
+        # with at least one strict group (cuisine/food_type/location).
+        partial_fallback = [
+            document
+            for document in fallback
+            if _strict_overlap_score(document, query_profile) > 0
+            and (not requested_locations or _has_location_overlap(document, requested_locations))
+        ]
+        if partial_fallback:
+            return _deduplicate_documents(partial_fallback, k=k)
+        if requested_locations:
+            return []
+        return _deduplicate_documents(fallback, k=k)
+    return _deduplicate_documents(matched + strict_only + fallback, k=k)
+
+
+def _passes_strict_constraints(document: Document, query_profile: dict[str, Any]) -> bool:
+    metadata = document.metadata
+    for group_name in STRICT_MATCH_GROUPS:
+        requested_values = set(query_profile["detected_tags"].get(group_name, []))
+        if not requested_values:
+            continue
+        raw_value = metadata.get(group_name, "")
+        doc_values = {value for value in str(raw_value).split("|") if value}
+        if group_name == "location" and not doc_values:
+            return False
+        if doc_values and not doc_values.intersection(requested_values):
+            return False
+    return True
+
+
+def _strict_overlap_score(document: Document, query_profile: dict[str, Any]) -> int:
+    metadata = document.metadata
+    score = 0
+    for group_name in STRICT_MATCH_GROUPS:
+        requested_values = set(query_profile["detected_tags"].get(group_name, []))
+        if not requested_values:
+            continue
+        raw_value = metadata.get(group_name, "")
+        doc_values = {value for value in str(raw_value).split("|") if value}
+        if doc_values.intersection(requested_values):
+            score += 1
+    return score
+
+
+def _has_location_overlap(document: Document, requested_locations: set[str]) -> bool:
+    raw_value = document.metadata.get("location", "")
+    doc_values = {value for value in str(raw_value).split("|") if value}
+    return bool(doc_values.intersection(requested_locations))
 
 
 def _deduplicate_documents(documents: list[Document], k: int) -> list[Document]:
@@ -318,7 +377,15 @@ def retrieve_documents(
     fetch_k: int = RETRIEVER_FETCH_K,
     weights: ScoringWeights | None = None,
 ) -> list[Document]:
-    candidates = vector_store.similarity_search(query_profile["expanded_query"], k=fetch_k)
+    strict_groups = sum(1 for group in STRICT_MATCH_GROUPS if query_profile["detected_tags"].get(group))
+    if strict_groups >= 2:
+        effective_fetch_k = max(fetch_k, k * 16)
+    elif strict_groups == 1:
+        effective_fetch_k = max(fetch_k, k * 10)
+    else:
+        effective_fetch_k = fetch_k
+
+    candidates = vector_store.similarity_search(query_profile["expanded_query"], k=effective_fetch_k)
     if not candidates:
         return []
 

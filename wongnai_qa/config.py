@@ -30,7 +30,8 @@ LLM_ADAPTER_DIR = os.getenv(
     str(BASE_DIR / "artifacts" / "qwen2_5_7b_instruct_lora_adapter"),
 )
 
-INDEX_SAMPLE_SIZE = int(os.getenv("WONGNAI_SAMPLE_SIZE", "3000"))
+# Default to full dataset by using a very large cap; can still be overridden via WONGNAI_SAMPLE_SIZE.
+INDEX_SAMPLE_SIZE = int(os.getenv("WONGNAI_SAMPLE_SIZE", "999999"))
 CHUNK_SIZE = int(os.getenv("WONGNAI_CHUNK_SIZE", "700"))
 CHUNK_OVERLAP = int(os.getenv("WONGNAI_CHUNK_OVERLAP", "120"))
 RETRIEVER_K = int(os.getenv("WONGNAI_RETRIEVER_K", "4"))
@@ -52,19 +53,19 @@ KEYWORD_MATCH_WEIGHT = 0.33
 EXACT_PHRASE_WEIGHT = 0.10
 
 DEFAULT_QUERY_SET = [
-    "แนะนำร้านอาหารอิตาลีหรือพิซซ่าให้หน่อย",
-    "อยากกินอาหารทะเลสดๆ หรือร้านซีฟู้ด",
-    "หาร้านบรรยากาศดี หรูหน่อย ราคาแรงได้สำหรับเดต",
+    "อยากกินซูชิหรือพาสต้า มีร้านไหนแนะนำ",
+    "อยากกินซีฟู้ดหรือเค้ก มีร้านไหนน่าสนใจบ้าง",
+    "หาร้านหรู ติดแอร์ ในห้าง ราคาไม่แพง",
     "มีร้านชิลๆ ติดทะเลแถวพัทยาไหม",
-    "อยากได้อาหารทะเลแบบไทยๆ ติดชายหาดแถวพัทยา",
+    "อยากได้พิซซ่าอิตาลี ติดแอร์ ในห้าง ราคาไม่แพง",
 ]
 
 ASSIGNMENT_QUERY_SET = {
-    "cuisine": "แนะนำร้านอาหารญี่ปุ่นหรืออาหารอิตาลีที่น่าสนใจ",
-    "food_type": "อยากกินอาหารทะเลหรือเบเกอรี่ มีร้านไหนน่าสนใจบ้าง",
-    "ambience_price": "หาร้านบรรยากาศหรู ติดแอร์ และราคาไม่แรงมาก",
-    "location": "มีร้านบรรยากาศสงบแถวเชียงใหม่หรือพัทยาไหม",
-    "mixed": "อยากได้อาหารทะเลแบบไทยๆ ติดชายหาดแถวพัทยา",
+    "cuisine": "อยากกินซูชิหรือพาสต้า มีร้านไหนแนะนำ",
+    "food_type": "อยากกินซีฟู้ดหรือเค้ก มีร้านไหนน่าสนใจบ้าง",
+    "ambience_price": "หาร้านหรู ติดแอร์ ในห้าง ราคาไม่แพง",
+    "location": "มีร้านชิลๆ ติดทะเลแถวพัทยาไหม",
+    "mixed": "อยากได้พิซซ่าอิตาลี ติดแอร์ ในห้าง ราคาไม่แพง",
 }
 
 
