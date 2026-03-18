@@ -451,12 +451,6 @@ def main() -> None:
         "summary",
         default=baseline_answer,
     )
-    baseline_improved_answer = get_result_value(
-        result,
-        "baseline_improved_answer",
-        "improved_answer",
-        default=baseline_answer,
-    )
     finetuned_improved_answer = get_result_value(
         result,
         "finetuned_improved_answer",
@@ -495,29 +489,16 @@ def main() -> None:
         )
 
     render_section_heading("คำตอบแบบสรุป", "คำตอบภาษาไทยแยกตามแหล่ง retrieval เพื่อเทียบคุณภาพคำตอบขั้นสุดท้าย")
-    baseline_final_col, finetuned_final_col = st.columns(2, gap="large")
-    with baseline_final_col:
-        st.markdown(
-            f"""
-            <div class="answer-card improved">
-                <div class="small-label">Baseline Final</div>
-                <div class="answer-title">คำตอบสรุปจาก baseline retrieval</div>
-                <pre class="answer-body">{escape(str(baseline_improved_answer))}</pre>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with finetuned_final_col:
-        st.markdown(
-            f"""
-            <div class="answer-card improved">
-                <div class="small-label">Finetuned Final</div>
-                <div class="answer-title">คำตอบสรุปจาก finetuned retrieval</div>
-                <pre class="answer-body">{escape(str(finetuned_improved_answer))}</pre>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        f"""
+        <div class="answer-card improved">
+            <div class="small-label">Finetuned Final</div>
+            <div class="answer-title">คำตอบสรุปจาก finetuned retrieval</div>
+            <pre class="answer-body">{escape(str(finetuned_improved_answer))}</pre>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     render_section_heading("รีวิวที่เกี่ยวข้อง", "หลักฐานอ้างอิงจากฝั่ง finetuned retriever ที่ใช้ประกอบคำตอบ")
     render_retrieved_documents(retrieved_documents)
